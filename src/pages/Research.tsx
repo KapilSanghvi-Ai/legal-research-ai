@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -23,73 +23,11 @@ import {
   FileText,
   Clock,
   Filter,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface SearchResult {
-  id: string;
-  citation: string;
-  title: string;
-  court: string;
-  bench?: string;
-  date: string;
-  snippet: string;
-  relevance: number;
-  sections: string[];
-  isBookmarked?: boolean;
-}
-
-const mockResults: SearchResult[] = [
-  {
-    id: "1",
-    citation: "CIT vs. Lovely Exports (P) Ltd [2008] 216 CTR 195 (SC)",
-    title:
-      "Share Application Money - Section 68 - Identity of Shareholders - Burden of Proof",
-    court: "Supreme Court",
-    date: "January 15, 2008",
-    snippet:
-      "Where the assessee has received subscriptions to share capital and has furnished complete particulars of the share applicants including their PAN, the initial onus to prove the identity of creditors stands discharged...",
-    relevance: 98,
-    sections: ["Section 68", "Section 69"],
-    isBookmarked: true,
-  },
-  {
-    id: "2",
-    citation: "Pr. CIT vs. NRA Iron & Steel [2019] 412 ITR 161 (SC)",
-    title:
-      "Section 68 - Three Ingredients - Identity, Creditworthiness, Genuineness",
-    court: "Supreme Court",
-    bench: "Justice R.F. Nariman, Justice Vineet Saran",
-    date: "March 5, 2019",
-    snippet:
-      "The assessee is under a legal obligation to prove the receipt of share capital/premium to the satisfaction of the AO, failure of which, the AO is entitled to treat the same as income of the assessee...",
-    relevance: 95,
-    sections: ["Section 68"],
-  },
-  {
-    id: "3",
-    citation: "CIT vs. Orissa Corporation (P) Ltd [1986] 159 ITR 78 (SC)",
-    title: "Burden of Proof in Income Tax - Foundational Principles",
-    court: "Supreme Court",
-    date: "August 12, 1986",
-    snippet:
-      "The onus of proving that a particular receipt is not taxable or is exempt from tax rests on the assessee who claims exemption. This principle has been consistently followed...",
-    relevance: 88,
-    sections: ["General Principles"],
-  },
-  {
-    id: "4",
-    citation: "DCIT vs. Rohini Builders [2023] 152 ITD 234 (Mum)",
-    title: "Bogus Purchases - Estimation of Profit - 12.5% GP Rate",
-    court: "ITAT Mumbai",
-    bench: "Shri Vikas Awasthy, JM & Shri M. Balaganesh, AM",
-    date: "July 20, 2023",
-    snippet:
-      "Where purchases are found to be from non-genuine parties but corresponding sales are not disputed, the entire purchase amount cannot be disallowed. Only profit element embedded in such purchases can be added...",
-    relevance: 85,
-    sections: ["Section 69C", "Bogus Purchases"],
-  },
-];
+import { searchLegalCases, type SearchResult } from "@/lib/api/search";
+import { useToast } from "@/hooks/use-toast";
 
 const recentSearches = [
   "Section 68 cash credits burden of proof",
@@ -109,18 +47,69 @@ export default function Research() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [courtFilter, setCourtFilter] = useState("all");
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(
-    new Set(["1"])
-  );
+  const [yearFilter, setYearFilter] = useState("all");
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim()) return;
+    
     setIsSearching(true);
-    // Simulate search
-    setTimeout(() => {
-      setResults(mockResults);
+    try {
+      const filters: { court?: string; fromYear?: number; toYear?: number } = {};
+      
+      if (courtFilter !== "all") {
+        filters.court = courtFilter;
+      }
+      
+      if (yearFilter !== "all") {
+        const currentYear = new Date().getFullYear();
+        switch (yearFilter) {
+          case "2024":
+            filters.fromYear = 2024;
+            filters.toYear = 2024;
+            break;
+          case "2023":
+            filters.fromYear = 2023;
+            filters.toYear = 2023;
+            break;
+          case "2022":
+            filters.fromYear = 2022;
+            filters.toYear = 2022;
+            break;
+          case "2020-2021":
+            filters.fromYear = 2020;
+            filters.toYear = 2021;
+            break;
+          case "2015-2019":
+            filters.fromYear = 2015;
+            filters.toYear = 2019;
+            break;
+          case "older":
+            filters.toYear = 2014;
+            break;
+        }
+      }
+
+      const response = await searchLegalCases(searchQuery, filters);
+      setResults(response.results);
+      
+      if (response.results.length === 0) {
+        toast({
+          title: "No results found",
+          description: "Try broadening your search terms or adjusting filters.",
+        });
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      toast({
+        title: "Search failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
       setIsSearching(false);
-    }, 1000);
+    }
   };
 
   const toggleBookmark = (id: string) => {
@@ -166,7 +155,14 @@ export default function Research() {
               className="h-12 px-8 bg-primary hover:bg-primary/90"
               disabled={isSearching}
             >
-              {isSearching ? "Searching..." : "Search"}
+              {isSearching ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                "Search"
+              )}
             </Button>
           </div>
 
@@ -184,7 +180,7 @@ export default function Research() {
                 <SelectItem value="itat">ITAT</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select value={yearFilter} onValueChange={setYearFilter}>
               <SelectTrigger className="w-36">
                 <Calendar className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Year" />
@@ -325,7 +321,12 @@ export default function Research() {
                               <FileText className="w-4 h-4 mr-1" />
                               Brief
                             </Button>
-                            <Button variant="outline" size="sm" className="h-8">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8"
+                              onClick={() => window.open(result.url, '_blank')}
+                            >
                               <ExternalLink className="w-4 h-4 mr-1" />
                               Open
                             </Button>
