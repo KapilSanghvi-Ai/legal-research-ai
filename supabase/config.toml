@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.embed-text]
 verify_jwt = false
+
+[functions.semantic-search]
+verify_jwt = false
