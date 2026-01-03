@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Legal research knowledge base for RAG context
+// Legal research knowledge base
 const LEGAL_CONTEXT = `
 You are a legal research assistant specialized in Indian tax law and litigation. You help legal professionals research case law, analyze judgments, and prepare litigation documents.
 
@@ -37,15 +38,106 @@ interface ChatMessage {
   content: string;
 }
 
-interface Citation {
-  id: number;
+interface RAGFragment {
   citation: string;
-  paragraph?: number;
-  snippet?: string;
+  court: string;
+  content: string;
+  similarity: number;
+  paragraphNum: number;
+}
+
+// Retrieve relevant fragments using semantic search
+async function retrieveRAGContext(query: string): Promise<RAGFragment[]> {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('RAG context skipped: missing credentials');
+    return [];
+  }
+
+  try {
+    console.log(`Generating embedding for RAG: "${query.substring(0, 50)}..."`);
+
+    // Generate embedding for the query
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: query,
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      console.error('Failed to generate embedding for RAG');
+      return [];
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    const queryEmbedding = embeddingData.data[0].embedding;
+
+    // Search for similar fragments
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: fragments, error } = await supabase.rpc('match_source_fragments', {
+      query_embedding: JSON.stringify(queryEmbedding),
+      match_threshold: 0.70,
+      match_count: 8,
+    });
+
+    if (error) {
+      console.error('RAG search error:', error);
+      return [];
+    }
+
+    console.log(`RAG retrieved ${fragments?.length || 0} relevant fragments`);
+
+    return (fragments || []).map((f: any) => ({
+      citation: f.citation,
+      court: f.court || 'Unknown',
+      content: f.content,
+      similarity: f.similarity,
+      paragraphNum: f.paragraph_num,
+    }));
+
+  } catch (error) {
+    console.error('RAG retrieval error:', error);
+    return [];
+  }
+}
+
+// Format RAG context for the prompt
+function formatRAGContext(fragments: RAGFragment[]): string {
+  if (fragments.length === 0) {
+    return '';
+  }
+
+  let context = '\n\n--- RELEVANT LEGAL SOURCES FROM DATABASE ---\n';
+  context += 'The following are relevant excerpts from legal judgments that may be helpful:\n\n';
+
+  fragments.forEach((fragment, index) => {
+    const truncatedContent = fragment.content.length > 800 
+      ? fragment.content.substring(0, 800) + '...' 
+      : fragment.content;
+    
+    context += `[${index + 1}] ${fragment.citation} (${fragment.court})\n`;
+    context += `Relevance: ${Math.round(fragment.similarity * 100)}%\n`;
+    context += `"${truncatedContent}"\n\n`;
+  });
+
+  context += '--- END OF SOURCES ---\n';
+  context += '\nIMPORTANT: Use these sources to support your response. Cite them using [1], [2], etc. ';
+  context += 'If these sources are relevant, prioritize them. You may also cite additional cases from your knowledge.\n';
+
+  return context;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -65,6 +157,15 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Extract the last user message for RAG retrieval
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+    const userQuery = lastUserMessage?.content || '';
+
+    // Retrieve relevant context using semantic search
+    console.log('Retrieving RAG context...');
+    const ragFragments = await retrieveRAGContext(userQuery);
+    const ragContext = formatRAGContext(ragFragments);
+
     // Build system prompt based on mode
     let systemPrompt = LEGAL_CONTEXT;
     
@@ -83,7 +184,10 @@ serve(async (req) => {
         break;
     }
 
-    systemPrompt += `\n\nIMPORTANT: When citing cases, use numbered references like [1], [2], etc. At the end of your response, list all citations with their full details.`;
+    // Add RAG context to system prompt
+    systemPrompt += ragContext;
+
+    systemPrompt += `\n\nCITATION INSTRUCTIONS: When citing cases, use numbered references like [1], [2], etc. At the end of your response, list all citations with their full details in a "Sources:" section.`;
 
     // Prepare messages for API call
     const apiMessages: ChatMessage[] = [
@@ -91,7 +195,7 @@ serve(async (req) => {
       ...messages
     ];
 
-    console.log(`Processing chat request with ${messages.length} messages in ${mode} mode`);
+    console.log(`Processing chat with ${messages.length} messages, ${ragFragments.length} RAG sources, mode: ${mode}`);
 
     // Call Lovable AI Gateway
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
