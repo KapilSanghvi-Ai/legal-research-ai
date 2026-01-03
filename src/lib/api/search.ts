@@ -4,6 +4,7 @@ interface SearchFilters {
   court?: string;
   fromYear?: number;
   toYear?: number;
+  pagenum?: number;
 }
 
 interface SearchResult {
@@ -24,6 +25,8 @@ interface SearchResponse {
   filters: SearchFilters;
   results: SearchResult[];
   totalResults: number;
+  pagenum: number;
+  found?: string;
   attribution: string;
 }
 
