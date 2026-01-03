@@ -46,53 +46,62 @@ export default function Research() {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [courtFilter, setCourtFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const { toast } = useToast();
+
+  const buildFilters = (pagenum: number = 0) => {
+    const filters: { court?: string; fromYear?: number; toYear?: number; pagenum?: number } = { pagenum };
+    
+    if (courtFilter !== "all") {
+      filters.court = courtFilter;
+    }
+    
+    if (yearFilter !== "all") {
+      switch (yearFilter) {
+        case "2024":
+          filters.fromYear = 2024;
+          filters.toYear = 2024;
+          break;
+        case "2023":
+          filters.fromYear = 2023;
+          filters.toYear = 2023;
+          break;
+        case "2022":
+          filters.fromYear = 2022;
+          filters.toYear = 2022;
+          break;
+        case "2020-2021":
+          filters.fromYear = 2020;
+          filters.toYear = 2021;
+          break;
+        case "2015-2019":
+          filters.fromYear = 2015;
+          filters.toYear = 2019;
+          break;
+        case "older":
+          filters.toYear = 2014;
+          break;
+      }
+    }
+    return filters;
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
     setIsSearching(true);
+    setCurrentPage(0);
     try {
-      const filters: { court?: string; fromYear?: number; toYear?: number } = {};
-      
-      if (courtFilter !== "all") {
-        filters.court = courtFilter;
-      }
-      
-      if (yearFilter !== "all") {
-        const currentYear = new Date().getFullYear();
-        switch (yearFilter) {
-          case "2024":
-            filters.fromYear = 2024;
-            filters.toYear = 2024;
-            break;
-          case "2023":
-            filters.fromYear = 2023;
-            filters.toYear = 2023;
-            break;
-          case "2022":
-            filters.fromYear = 2022;
-            filters.toYear = 2022;
-            break;
-          case "2020-2021":
-            filters.fromYear = 2020;
-            filters.toYear = 2021;
-            break;
-          case "2015-2019":
-            filters.fromYear = 2015;
-            filters.toYear = 2019;
-            break;
-          case "older":
-            filters.toYear = 2014;
-            break;
-        }
-      }
-
-      const response = await searchLegalCases(searchQuery, filters);
+      const response = await searchLegalCases(searchQuery, buildFilters(0));
       setResults(response.results);
+      setTotalResults(response.totalResults);
+      setHasMore(response.results.length === 10 && response.totalResults > 10);
       
       if (response.results.length === 0) {
         toast({
@@ -109,6 +118,26 @@ export default function Research() {
       });
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    const nextPage = currentPage + 1;
+    setIsLoadingMore(true);
+    try {
+      const response = await searchLegalCases(searchQuery, buildFilters(nextPage));
+      setResults(prev => [...prev, ...response.results]);
+      setCurrentPage(nextPage);
+      setHasMore(response.results.length === 10);
+    } catch (error) {
+      console.error('Load more failed:', error);
+      toast({
+        title: "Failed to load more",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -207,7 +236,8 @@ export default function Research() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Found <span className="font-medium text-foreground">{results.length}</span> relevant judgments
+                Showing <span className="font-medium text-foreground">{results.length}</span> of{" "}
+                <span className="font-medium text-foreground">{totalResults.toLocaleString()}</span> judgments
               </p>
               <Tabs defaultValue="relevance">
                 <TabsList className="h-8">
@@ -225,9 +255,9 @@ export default function Research() {
             </div>
 
             <div className="space-y-3">
-              {results.map((result) => (
+              {results.map((result, index) => (
                 <Card
-                  key={result.id}
+                  key={`${result.docId}-${index}`}
                   className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
                 >
                   <CardContent className="p-5">
@@ -338,6 +368,27 @@ export default function Research() {
                 </Card>
               ))}
             </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="min-w-[200px]"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More Results"
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
