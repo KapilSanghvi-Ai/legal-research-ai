@@ -7,6 +7,9 @@ import Index from "./pages/Index";
 import Cases from "./pages/Cases";
 import Research from "./pages/Research";
 import Chat from "./pages/Chat";
+import Documents from "./pages/Documents";
+import Templates from "./pages/Templates";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +25,9 @@ const App = () => (
           <Route path="/cases" element={<Cases />} />
           <Route path="/research" element={<Research />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
