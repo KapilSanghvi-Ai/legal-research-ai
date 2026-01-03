@@ -21,19 +21,17 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     console.log(`Generating embedding for text of length: ${text.length}`);
 
-    // Use Lovable AI Gateway for embeddings
-    // Note: The gateway provides access to embedding models
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -44,20 +42,8 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Embedding error:', response.status, errorText);
-      
-      // Return a mock embedding for development
-      // In production, this would fail
-      console.log('Returning mock embedding for development');
-      const mockEmbedding = Array(1536).fill(0).map(() => Math.random() * 2 - 1);
-      return new Response(
-        JSON.stringify({ 
-          embedding: mockEmbedding,
-          model: 'mock',
-          usage: { prompt_tokens: text.split(' ').length, total_tokens: text.split(' ').length }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('OpenAI embedding error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
