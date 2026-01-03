@@ -54,10 +54,10 @@ export function TopBar({ title }: TopBarProps) {
             <Button variant="ghost" className="flex items-center gap-2 px-2">
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-                  RK
+                  MC
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium hidden md:inline">Rajesh Kumar</span>
+              <span className="text-sm font-medium hidden md:inline">Maharishi &amp; Co</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
