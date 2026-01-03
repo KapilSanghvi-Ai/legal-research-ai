@@ -11,10 +11,20 @@ interface Citation {
   paragraph?: number;
 }
 
+export interface RAGSource {
+  id: number;
+  citation: string;
+  court: string;
+  content: string;
+  similarity: number;
+  sourceId: string;
+}
+
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onDone: () => void;
   onError?: (error: Error) => void;
+  onRAGSources?: (sources: RAGSource[]) => void;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/legal-chat`;
@@ -86,6 +96,13 @@ export async function streamLegalChat(
 
         try {
           const parsed = JSON.parse(jsonStr);
+          
+          // Handle RAG sources event
+          if (parsed.type === 'rag_sources' && parsed.sources) {
+            callbacks.onRAGSources?.(parsed.sources);
+            continue;
+          }
+          
           const content = parsed.choices?.[0]?.delta?.content;
           if (content) {
             callbacks.onDelta(content);

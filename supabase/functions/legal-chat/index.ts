@@ -44,6 +44,7 @@ interface RAGFragment {
   content: string;
   similarity: number;
   paragraphNum: number;
+  sourceId: string;
 }
 
 // Retrieve relevant fragments using semantic search
@@ -103,6 +104,7 @@ async function retrieveRAGContext(query: string): Promise<RAGFragment[]> {
       content: f.content,
       similarity: f.similarity,
       paragraphNum: f.paragraph_num,
+      sourceId: f.source_id,
     }));
 
   } catch (error) {
@@ -135,6 +137,44 @@ function formatRAGContext(fragments: RAGFragment[]): string {
   context += 'If these sources are relevant, prioritize them. You may also cite additional cases from your knowledge.\n';
 
   return context;
+}
+
+// Create a streaming response that includes RAG sources as first event
+function createRAGStreamResponse(ragFragments: RAGFragment[], aiStream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  
+  return new ReadableStream({
+    async start(controller) {
+      // Send RAG sources as first SSE event
+      if (ragFragments.length > 0) {
+        const ragEvent = `data: ${JSON.stringify({ 
+          type: 'rag_sources', 
+          sources: ragFragments.map((f, i) => ({
+            id: i + 1,
+            citation: f.citation,
+            court: f.court,
+            content: f.content.substring(0, 500) + (f.content.length > 500 ? '...' : ''),
+            similarity: Math.round(f.similarity * 100),
+            sourceId: f.sourceId,
+          }))
+        })}\n\n`;
+        controller.enqueue(encoder.encode(ragEvent));
+      }
+
+      // Forward the AI stream
+      const reader = aiStream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+      } finally {
+        reader.releaseLock();
+        controller.close();
+      }
+    }
+  });
 }
 
 serve(async (req) => {
@@ -229,8 +269,11 @@ serve(async (req) => {
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
+    // Create combined stream with RAG sources
+    const combinedStream = createRAGStreamResponse(ragFragments, response.body!);
+
     // Stream the response back
-    return new Response(response.body, {
+    return new Response(combinedStream, {
       headers: { 
         ...corsHeaders, 
         'Content-Type': 'text/event-stream',
