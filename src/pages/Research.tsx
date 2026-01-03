@@ -24,9 +24,16 @@ import {
   Clock,
   Filter,
   Loader2,
+  Brain,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { searchLegalCases, type SearchResult } from "@/lib/api/search";
+import { 
+  searchLegalCases, 
+  semanticSearch, 
+  type SearchResult, 
+  type SemanticSearchResult 
+} from "@/lib/api/search";
 import { useToast } from "@/hooks/use-toast";
 
 const recentSearches = [
@@ -45,6 +52,7 @@ const suggestedQueries = [
 export default function Research() {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [semanticResults, setSemanticResults] = useState<SemanticSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [courtFilter, setCourtFilter] = useState("all");
@@ -53,6 +61,7 @@ export default function Research() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
   const { toast } = useToast();
 
   const buildFilters = (pagenum: number = 0) => {
@@ -97,17 +106,34 @@ export default function Research() {
     
     setIsSearching(true);
     setCurrentPage(0);
+    setResults([]);
+    setSemanticResults([]);
+    
     try {
-      const response = await searchLegalCases(searchQuery, buildFilters(0));
-      setResults(response.results);
-      setTotalResults(response.totalResults);
-      setHasMore(response.results.length === 10 && response.totalResults > 10);
-      
-      if (response.results.length === 0) {
-        toast({
-          title: "No results found",
-          description: "Try broadening your search terms or adjusting filters.",
-        });
+      if (searchMode === "semantic") {
+        const response = await semanticSearch(searchQuery, 0.75, 20);
+        setSemanticResults(response.results);
+        setTotalResults(response.totalResults);
+        setHasMore(false); // Semantic search doesn't support pagination
+        
+        if (response.results.length === 0) {
+          toast({
+            title: "No cached documents found",
+            description: "Semantic search requires documents to be cached. Try keyword search first.",
+          });
+        }
+      } else {
+        const response = await searchLegalCases(searchQuery, buildFilters(0));
+        setResults(response.results);
+        setTotalResults(response.totalResults);
+        setHasMore(response.results.length === 10 && response.totalResults > 10);
+        
+        if (response.results.length === 0) {
+          toast({
+            title: "No results found",
+            description: "Try broadening your search terms or adjusting filters.",
+          });
+        }
       }
     } catch (error) {
       console.error('Search failed:', error);
@@ -167,6 +193,33 @@ export default function Research() {
             </p>
           </div>
 
+          {/* Search Mode Toggle */}
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              variant={searchMode === "keyword" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSearchMode("keyword")}
+              className="gap-2"
+            >
+              <Globe className="w-4 h-4" />
+              Keyword Search
+            </Button>
+            <Button
+              variant={searchMode === "semantic" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSearchMode("semantic")}
+              className="gap-2"
+            >
+              <Brain className="w-4 h-4" />
+              Semantic Search
+            </Button>
+            {searchMode === "semantic" && (
+              <span className="text-xs text-muted-foreground ml-2">
+                Searches cached documents using AI embeddings
+              </span>
+            )}
+          </div>
+
           {/* Search Bar */}
           <div className="flex gap-3">
             <div className="relative flex-1">
@@ -195,54 +248,60 @@ export default function Research() {
             </Button>
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <Select value={courtFilter} onValueChange={setCourtFilter}>
-              <SelectTrigger className="w-36">
-                <Building2 className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Court" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Courts</SelectItem>
-                <SelectItem value="sc">Supreme Court</SelectItem>
-                <SelectItem value="hc">High Courts</SelectItem>
-                <SelectItem value="itat">ITAT</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="w-36">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
-                <SelectItem value="2022">2022</SelectItem>
-                <SelectItem value="2020-2021">2020-2021</SelectItem>
-                <SelectItem value="2015-2019">2015-2019</SelectItem>
-                <SelectItem value="older">Before 2015</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="w-4 h-4" />
-              More Filters
-            </Button>
-          </div>
+          {/* Filters - Only show for keyword search */}
+          {searchMode === "keyword" && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <Select value={courtFilter} onValueChange={setCourtFilter}>
+                <SelectTrigger className="w-36">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Court" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Courts</SelectItem>
+                  <SelectItem value="sc">Supreme Court</SelectItem>
+                  <SelectItem value="hc">High Courts</SelectItem>
+                  <SelectItem value="itat">ITAT</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="w-36">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Years</SelectItem>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2023">2023</SelectItem>
+                  <SelectItem value="2022">2022</SelectItem>
+                  <SelectItem value="2020-2021">2020-2021</SelectItem>
+                  <SelectItem value="2015-2019">2015-2019</SelectItem>
+                  <SelectItem value="older">Before 2015</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter className="w-4 h-4" />
+                More Filters
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Results or Suggestions */}
-        {results.length > 0 ? (
+        {(results.length > 0 || semanticResults.length > 0) ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{results.length}</span> of{" "}
-                <span className="font-medium text-foreground">{totalResults.toLocaleString()}</span> judgments
+                {searchMode === "semantic" ? (
+                  <>Found <span className="font-medium text-foreground">{semanticResults.length}</span> cached documents</>
+                ) : (
+                  <>Showing <span className="font-medium text-foreground">{results.length}</span> of{" "}
+                  <span className="font-medium text-foreground">{totalResults.toLocaleString()}</span> judgments</>
+                )}
               </p>
               <Tabs defaultValue="relevance">
                 <TabsList className="h-8">
                   <TabsTrigger value="relevance" className="text-xs h-7">
-                    Relevance
+                    {searchMode === "semantic" ? "Similarity" : "Relevance"}
                   </TabsTrigger>
                   <TabsTrigger value="date" className="text-xs h-7">
                     Date
@@ -255,7 +314,90 @@ export default function Research() {
             </div>
 
             <div className="space-y-3">
-              {results.map((result, index) => (
+              {/* Semantic Search Results */}
+              {searchMode === "semantic" && semanticResults.map((result, index) => (
+                <Card
+                  key={`${result.id}-${index}`}
+                  className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2.5 rounded-lg bg-primary/10 flex-shrink-0">
+                        <Brain className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors">
+                              {result.citation}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Paragraph {result.paragraphNum} • {result.court}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div
+                              className={cn(
+                                "px-2 py-1 rounded-full text-xs font-medium",
+                                result.similarity >= 90
+                                  ? "bg-success/15 text-success"
+                                  : result.similarity >= 80
+                                  ? "bg-warning/15 text-warning"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {result.similarity}% similar
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-foreground/80 mt-3 line-clamp-3">
+                          {result.content}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5" />
+                              {result.court}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookmark(result.id);
+                              }}
+                            >
+                              <Star
+                                className={cn(
+                                  "w-4 h-4",
+                                  bookmarkedIds.has(result.id) &&
+                                    "fill-accent text-accent"
+                                )}
+                              />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-muted-foreground hover:text-foreground"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add to Case
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Keyword Search Results */}
+              {searchMode === "keyword" && results.map((result, index) => (
                 <Card
                   key={`${result.docId}-${index}`}
                   className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
@@ -369,8 +511,8 @@ export default function Research() {
               ))}
             </div>
 
-            {/* Load More Button */}
-            {hasMore && (
+            {/* Load More Button - Only for keyword search */}
+            {searchMode === "keyword" && hasMore && (
               <div className="flex justify-center pt-4">
                 <Button
                   variant="outline"

@@ -30,6 +30,24 @@ interface SearchResponse {
   attribution: string;
 }
 
+interface SemanticSearchResult {
+  id: string;
+  sourceId: string;
+  paragraphNum: number;
+  content: string;
+  similarity: number;
+  citation: string;
+  court: string;
+}
+
+interface SemanticSearchResponse {
+  query: string;
+  results: SemanticSearchResult[];
+  allFragments: SemanticSearchResult[];
+  totalResults: number;
+  attribution: string;
+}
+
 export async function searchLegalCases(
   query: string,
   filters: SearchFilters = {}
@@ -46,4 +64,21 @@ export async function searchLegalCases(
   return data as SearchResponse;
 }
 
-export type { SearchFilters, SearchResult, SearchResponse };
+export async function semanticSearch(
+  query: string,
+  matchThreshold: number = 0.75,
+  matchCount: number = 10
+): Promise<SemanticSearchResponse> {
+  const { data, error } = await supabase.functions.invoke('semantic-search', {
+    body: { query, matchThreshold, matchCount }
+  });
+
+  if (error) {
+    console.error('Semantic search error:', error);
+    throw new Error(error.message || 'Semantic search failed');
+  }
+
+  return data as SemanticSearchResponse;
+}
+
+export type { SearchFilters, SearchResult, SearchResponse, SemanticSearchResult, SemanticSearchResponse };
