@@ -2,6 +2,7 @@ import { User, Bot, ExternalLink, Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { RAGSourcesCard, type RAGSource } from "./RAGSourcesCard";
 
 interface Citation {
   id: number;
@@ -13,6 +14,7 @@ interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  ragSources?: RAGSource[];
   timestamp?: string;
   confidence?: "high" | "medium" | "low";
 }
@@ -21,6 +23,7 @@ export function ChatMessage({
   role,
   content,
   citations = [],
+  ragSources = [],
   timestamp,
   confidence,
 }: ChatMessageProps) {
@@ -95,9 +98,14 @@ export function ChatMessage({
           )}
         </div>
 
-        <div className="text-sm text-foreground/90 leading-relaxed legal-body">
+        <div className="text-sm text-foreground/90 leading-relaxed legal-body whitespace-pre-wrap">
           {renderContent()}
         </div>
+
+        {/* RAG Sources Card */}
+        {ragSources.length > 0 && role === "assistant" && (
+          <RAGSourcesCard sources={ragSources} />
+        )}
 
         {/* Citations List */}
         {citations.length > 0 && role === "assistant" && (

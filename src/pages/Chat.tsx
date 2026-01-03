@@ -3,10 +3,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { SourcePanel } from "@/components/research/SourcePanel";
+import { RAGSourcesCard, type RAGSource } from "@/components/chat/RAGSourcesCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, History, PanelRightClose, PanelRight, AlertCircle } from "lucide-react";
+import { Sparkles, History, PanelRightClose, PanelRight } from "lucide-react";
 import { streamLegalChat, extractCitations, type ChatMessage as ApiChatMessage, type Citation } from "@/lib/api/chat";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,6 +16,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  ragSources?: RAGSource[];
   timestamp: string;
   confidence?: "high" | "medium" | "low";
 }
@@ -45,6 +47,7 @@ export default function Chat() {
   const [showSources, setShowSources] = useState(true);
   const [activeSourceId, setActiveSourceId] = useState<string>();
   const [sources, setSources] = useState<Source[]>([]);
+  const [currentRAGSources, setCurrentRAGSources] = useState<RAGSource[]>([]);
   const { toast } = useToast();
 
   const handleSend = async (content: string, mode: string) => {
@@ -69,19 +72,24 @@ export default function Chat() {
 
     let assistantContent = "";
     const assistantId = (Date.now() + 1).toString();
+    let messageRAGSources: RAGSource[] = [];
 
     try {
       await streamLegalChat(
         apiMessages,
         mode as 'sources-only' | 'balanced' | 'creative' | 'tribunal',
         {
+          onRAGSources: (sources) => {
+            messageRAGSources = sources;
+            setCurrentRAGSources(sources);
+          },
           onDelta: (text) => {
             assistantContent += text;
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
               if (lastMessage?.role === "assistant" && lastMessage.id === assistantId) {
                 return prev.map((m, i) =>
-                  i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                  i === prev.length - 1 ? { ...m, content: assistantContent, ragSources: messageRAGSources } : m
                 );
               }
               return [
@@ -90,6 +98,7 @@ export default function Chat() {
                   id: assistantId,
                   role: "assistant" as const,
                   content: assistantContent,
+                  ragSources: messageRAGSources,
                   timestamp: new Date().toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -106,7 +115,7 @@ export default function Chat() {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
-                    ? { ...m, citations, confidence: "high" as const }
+                    ? { ...m, citations, confidence: "high" as const, ragSources: messageRAGSources }
                     : m
                 )
               );
