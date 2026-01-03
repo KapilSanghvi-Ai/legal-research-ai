@@ -14,16 +14,264 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bookmarks: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          source_id: string
+          tags: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          source_id: string
+          tags?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          source_id?: string
+          tags?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: true
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          citations: Json | null
+          completion_tokens: number | null
+          confidence: string | null
+          content: string
+          created_at: string
+          id: string
+          model_used: string | null
+          prompt_tokens: number | null
+          role: string
+          session_id: string
+        }
+        Insert: {
+          citations?: Json | null
+          completion_tokens?: number | null
+          confidence?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          model_used?: string | null
+          prompt_tokens?: number | null
+          role: string
+          session_id: string
+        }
+        Update: {
+          citations?: Json | null
+          completion_tokens?: number | null
+          confidence?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          model_used?: string | null
+          prompt_tokens?: number | null
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "research_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_sessions: {
+        Row: {
+          context_tags: string[] | null
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          context_tags?: string[] | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          context_tags?: string[] | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      search_history: {
+        Row: {
+          created_at: string
+          filters: Json | null
+          id: string
+          query: string
+          results_count: number | null
+          session_id: string | null
+          source_ids: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json | null
+          id?: string
+          query: string
+          results_count?: number | null
+          session_id?: string | null
+          source_ids?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          filters?: Json | null
+          id?: string
+          query?: string
+          results_count?: number | null
+          session_id?: string | null
+          source_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_history_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "research_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_fragments: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          paragraph_num: number
+          source_id: string
+          token_count: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          paragraph_num: number
+          source_id: string
+          token_count?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          paragraph_num?: number
+          source_id?: string
+          token_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_fragments_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          bench: string | null
+          cached_at: string
+          citation: string
+          court: string | null
+          full_text: string | null
+          headnote: string | null
+          id: string
+          ik_doc_id: string
+          judgment_date: string | null
+          sections_cited: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          bench?: string | null
+          cached_at?: string
+          citation: string
+          court?: string | null
+          full_text?: string | null
+          headnote?: string | null
+          id?: string
+          ik_doc_id: string
+          judgment_date?: string | null
+          sections_cited?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          bench?: string | null
+          cached_at?: string
+          citation?: string
+          court?: string | null
+          full_text?: string | null
+          headnote?: string | null
+          id?: string
+          ik_doc_id?: string
+          judgment_date?: string | null
+          sections_cited?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_source_fragments: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          citation: string
+          content: string
+          court: string
+          id: string
+          paragraph_num: number
+          similarity: number
+          source_id: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      case_stage: "assessment" | "cita" | "itat" | "closed"
+      case_status: "drafting" | "research" | "hearing" | "archived"
+      citation_purpose: "support" | "distinguish" | "reference"
+      document_type:
+        | "memo"
+        | "sof"
+        | "goa"
+        | "submission"
+        | "reply"
+        | "brief"
+        | "toa"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +398,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      case_stage: ["assessment", "cita", "itat", "closed"],
+      case_status: ["drafting", "research", "hearing", "archived"],
+      citation_purpose: ["support", "distinguish", "reference"],
+      document_type: [
+        "memo",
+        "sof",
+        "goa",
+        "submission",
+        "reply",
+        "brief",
+        "toa",
+      ],
+    },
   },
 } as const
