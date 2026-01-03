@@ -6,15 +6,27 @@ import { SourcePanel } from "@/components/research/SourcePanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, History, PanelRightClose, PanelRight } from "lucide-react";
+import { Sparkles, History, PanelRightClose, PanelRight, AlertCircle } from "lucide-react";
+import { streamLegalChat, extractCitations, type ChatMessage as ApiChatMessage, type Citation } from "@/lib/api/chat";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  citations?: { id: number; citation: string; paragraph?: number }[];
+  citations?: Citation[];
   timestamp: string;
   confidence?: "high" | "medium" | "low";
+}
+
+interface Source {
+  id: string;
+  citation: string;
+  title: string;
+  court: string;
+  date: string;
+  relevance: number;
+  isBookmarked?: boolean;
 }
 
 const initialMessages: Message[] = [
@@ -23,44 +35,7 @@ const initialMessages: Message[] = [
     role: "assistant",
     content:
       "Welcome to LegalRAG. I can help you research case law, analyze judgments, and draft legal documents. Ask me about any tax litigation issue, and I'll provide citations from relevant judgments.\n\nFor example, you could ask:\n• What are the principles for addition under Section 68?\n• Find judgments on bogus purchase additions\n• Explain the burden of proof in reassessment cases",
-    timestamp: "10:00 AM",
-  },
-];
-
-const mockSources = [
-  {
-    id: "1",
-    citation: "CIT vs. Lovely Exports (P) Ltd [2008] 216 CTR 195 (SC)",
-    title:
-      "Supreme Court on Cash Credits u/s 68 - Identity, Creditworthiness and Genuineness",
-    court: "Supreme Court",
-    date: "2008",
-    relevance: 95,
-    isBookmarked: true,
-  },
-  {
-    id: "2",
-    citation: "Pr. CIT vs. NRA Iron & Steel [2019] 412 ITR 161 (SC)",
-    title: "Burden of Proof on Assessee in Section 68 Cases - Three Conditions",
-    court: "Supreme Court",
-    date: "2019",
-    relevance: 92,
-  },
-  {
-    id: "3",
-    citation: "DCIT vs. Rohini Builders [2023] ITAT Mumbai",
-    title: "Estimation of Profit on Bogus Purchases - 12.5% GP Addition",
-    court: "ITAT Mumbai",
-    date: "2023",
-    relevance: 88,
-  },
-  {
-    id: "4",
-    citation: "CIT vs. Orissa Corporation (P) Ltd [1986] 159 ITR 78 (SC)",
-    title: "Principle of Onus in Income Tax - Foundational Case",
-    court: "Supreme Court",
-    date: "1986",
-    relevance: 75,
+    timestamp: "Just now",
   },
 ];
 
@@ -69,6 +44,8 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSources, setShowSources] = useState(true);
   const [activeSourceId, setActiveSourceId] = useState<string>();
+  const [sources, setSources] = useState<Source[]>([]);
+  const { toast } = useToast();
 
   const handleSend = async (content: string, mode: string) => {
     const userMessage: Message = {
@@ -84,39 +61,90 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Based on my analysis of relevant judgments, here are the key principles regarding your query:\n\n**Section 68 - Cash Credits**\n\nThe Hon'ble Supreme Court in CIT vs. Lovely Exports [1] established that where the assessee furnishes the complete details of shareholders including their PAN, the initial onus stands discharged.\n\nHowever, in the later decision of Pr. CIT vs. NRA Iron & Steel [2], the Supreme Court clarified that the assessee must prove three ingredients:\n1. Identity of the creditor\n2. Creditworthiness of the creditor\n3. Genuineness of the transaction\n\nThe ITAT Mumbai in DCIT vs. Rohini Builders [3] applied these principles to bogus purchase cases, holding that where purchases are not verifiable but sales are accepted, only the profit element (12.5% GP) can be added.\n\n**Recommendation**: For your case, ensure documentation of all three ingredients is available. If dealing with share capital, bank statements of subscribers along with their returns would strengthen the position.`,
-        citations: [
-          {
-            id: 1,
-            citation: "CIT vs. Lovely Exports (P) Ltd [2008] 216 CTR 195 (SC)",
-            paragraph: 12,
-          },
-          {
-            id: 2,
-            citation: "Pr. CIT vs. NRA Iron & Steel [2019] 412 ITR 161 (SC)",
-            paragraph: 28,
-          },
-          {
-            id: 3,
-            citation: "DCIT vs. Rohini Builders [2023] ITAT Mumbai",
-            paragraph: 45,
-          },
-        ],
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        confidence: "high",
-      };
+    // Prepare messages for API
+    const apiMessages: ApiChatMessage[] = messages
+      .filter(m => m.id !== "1") // Skip initial welcome message
+      .map(m => ({ role: m.role, content: m.content }));
+    apiMessages.push({ role: "user", content });
 
-      setMessages((prev) => [...prev, aiMessage]);
+    let assistantContent = "";
+    const assistantId = (Date.now() + 1).toString();
+
+    try {
+      await streamLegalChat(
+        apiMessages,
+        mode as 'sources-only' | 'balanced' | 'creative' | 'tribunal',
+        {
+          onDelta: (text) => {
+            assistantContent += text;
+            setMessages((prev) => {
+              const lastMessage = prev[prev.length - 1];
+              if (lastMessage?.role === "assistant" && lastMessage.id === assistantId) {
+                return prev.map((m, i) =>
+                  i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                );
+              }
+              return [
+                ...prev,
+                {
+                  id: assistantId,
+                  role: "assistant" as const,
+                  content: assistantContent,
+                  timestamp: new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                },
+              ];
+            });
+          },
+          onDone: () => {
+            setIsLoading(false);
+            // Extract citations from the response
+            const citations = extractCitations(assistantContent);
+            if (citations.length > 0) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, citations, confidence: "high" as const }
+                    : m
+                )
+              );
+              // Add citations as sources
+              const newSources: Source[] = citations.map((c, i) => ({
+                id: `source-${Date.now()}-${i}`,
+                citation: c.citation,
+                title: c.citation.split(' - ')[1] || c.citation,
+                court: c.citation.includes('(SC)') ? 'Supreme Court' : 
+                       c.citation.includes('(HC)') ? 'High Court' : 'ITAT',
+                date: c.citation.match(/\[(\d{4})\]/)?.[1] || 'Unknown',
+                relevance: 95 - i * 5,
+              }));
+              setSources((prev) => {
+                const existing = new Set(prev.map(s => s.citation));
+                const unique = newSources.filter(s => !existing.has(s.citation));
+                return [...unique, ...prev].slice(0, 20);
+              });
+            }
+          },
+          onError: (error) => {
+            setIsLoading(false);
+            toast({
+              title: "Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          },
+        }
+      );
+    } catch (error) {
       setIsLoading(false);
-    }, 2000);
+      toast({
+        title: "Failed to get response",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -128,7 +156,7 @@ export default function Chat() {
           <div className="h-12 border-b border-border flex items-center justify-between px-4 bg-card/50">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium">New Research Session</span>
+              <span className="text-sm font-medium">Legal Research Session</span>
               <Badge variant="secondary" className="text-xs">
                 Tax Litigation
               </Badge>
@@ -159,7 +187,7 @@ export default function Chat() {
               {messages.map((message) => (
                 <ChatMessage key={message.id} {...message} />
               ))}
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex gap-4 p-4">
                   <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
                     <Sparkles className="w-4 h-4 text-accent-foreground animate-pulse-subtle" />
@@ -196,7 +224,7 @@ export default function Chat() {
         {showSources && (
           <div className="w-[360px] flex-shrink-0">
             <SourcePanel
-              sources={mockSources}
+              sources={sources}
               activeSourceId={activeSourceId}
               onSourceClick={(source) => setActiveSourceId(source.id)}
             />
