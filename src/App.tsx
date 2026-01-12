@@ -11,10 +11,6 @@ import Documents from "./pages/Documents";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import CaseDetail from "./pages/CaseDetail";
-import Calendar from "./pages/Calendar";
-import Tasks from "./pages/Tasks";
-import Clients from "./pages/Clients";
 
 const queryClient = new QueryClient();
 
@@ -32,10 +28,6 @@ const App = () => (
           <Route path="/documents" element={<Documents />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/cases/:id" element={<CaseDetail />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/clients" element={<Clients />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
