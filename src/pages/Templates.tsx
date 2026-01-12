@@ -3,6 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GDriveTemplates } from "@/components/gdrive/GDriveTemplates";
 import {
   FileText,
   Search,
@@ -10,6 +12,8 @@ import {
   Copy,
   Download,
   Star,
+  Cloud,
+  FolderOpen,
 } from "lucide-react";
 
 const templates = [
@@ -92,71 +96,93 @@ export default function Templates() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search templates..."
-            className="pl-10 bg-card border-border/60"
-          />
-        </div>
+        {/* Tabs for Local vs Google Drive */}
+        <Tabs defaultValue="gdrive" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="gdrive" className="gap-2">
+              <Cloud className="w-4 h-4" />
+              Google Drive
+            </TabsTrigger>
+            <TabsTrigger value="local" className="gap-2">
+              <FolderOpen className="w-4 h-4" />
+              Local Templates
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Templates Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map((template) => (
-            <Card
-              key={template.id}
-              className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="p-2.5 rounded-lg bg-primary/10 flex-shrink-0">
-                    <FileText className="w-5 h-5 text-primary" />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-accent"
-                  >
-                    <Star
-                      className={`w-4 h-4 ${
-                        template.starred ? "fill-accent text-accent" : ""
-                      }`}
-                    />
-                  </Button>
-                </div>
-                <div className="mt-4">
-                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
-                    {template.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {template.description}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <Badge
-                    variant="secondary"
-                    className={categoryColors[template.category]}
-                  >
-                    {template.category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {template.downloads} uses
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/50">
-                  <Button variant="outline" size="sm" className="flex-1 gap-1">
-                    <Copy className="w-3.5 h-3.5" />
-                    Use
-                  </Button>
-                  <Button variant="ghost" size="sm" className="gap-1">
-                    <Download className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          {/* Google Drive Templates */}
+          <TabsContent value="gdrive">
+            <GDriveTemplates />
+          </TabsContent>
+
+          {/* Local Templates */}
+          <TabsContent value="local" className="space-y-6">
+            {/* Search */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search templates..."
+                className="pl-10 bg-card border-border/60"
+              />
+            </div>
+
+            {/* Templates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map((template) => (
+                <Card
+                  key={template.id}
+                  className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div className="p-2.5 rounded-lg bg-primary/10 flex-shrink-0">
+                        <FileText className="w-5 h-5 text-primary" />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-accent"
+                      >
+                        <Star
+                          className={`w-4 h-4 ${
+                            template.starred ? "fill-accent text-accent" : ""
+                          }`}
+                        />
+                      </Button>
+                    </div>
+                    <div className="mt-4">
+                      <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
+                        {template.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {template.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between mt-4">
+                      <Badge
+                        variant="secondary"
+                        className={categoryColors[template.category]}
+                      >
+                        {template.category}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {template.downloads} uses
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/50">
+                      <Button variant="outline" size="sm" className="flex-1 gap-1">
+                        <Copy className="w-3.5 h-3.5" />
+                        Use
+                      </Button>
+                      <Button variant="ghost" size="sm" className="gap-1">
+                        <Download className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
