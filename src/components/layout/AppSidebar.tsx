@@ -45,7 +45,7 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: "MATTERS",
+    label: "LITIGATION",
     defaultOpen: true,
     items: [
       { icon: Briefcase, label: "Active Cases", href: "/cases" },
