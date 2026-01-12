@@ -11,3 +11,21 @@ verify_jwt = false
 
 [functions.semantic-search]
 verify_jwt = false
+
+[functions.gdrive-list]
+verify_jwt = false
+
+[functions.gdrive-upload]
+verify_jwt = false
+
+[functions.gdrive-download]
+verify_jwt = false
+
+[functions.gdrive-templates]
+verify_jwt = false
+
+[functions.gdrive-knowledge]
+verify_jwt = false
+
+[functions.gdrive-client-folder]
+verify_jwt = false
