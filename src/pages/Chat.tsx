@@ -4,10 +4,14 @@ import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { SourcePanel } from "@/components/research/SourcePanel";
 import { RAGSourcesCard, type RAGSource } from "@/components/chat/RAGSourcesCard";
+import { ConfidenceMeter } from "@/components/chat/ConfidenceMeter";
+import { ModeSelector } from "@/components/chat/ModeSelector";
+import { AIResponseLoading } from "@/components/ui/loading-states";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, History, PanelRightClose, PanelRight } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sparkles, History, PanelRightClose, PanelRight, Settings2 } from "lucide-react";
 import { streamLegalChat, extractCitations, type ChatMessage as ApiChatMessage, type Citation } from "@/lib/api/chat";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,6 +45,8 @@ const initialMessages: Message[] = [
   },
 ];
 
+type ResponseMode = "sources-only" | "balanced" | "creative" | "tribunal";
+
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,9 +54,11 @@ export default function Chat() {
   const [activeSourceId, setActiveSourceId] = useState<string>();
   const [sources, setSources] = useState<Source[]>([]);
   const [currentRAGSources, setCurrentRAGSources] = useState<RAGSource[]>([]);
+  const [responseMode, setResponseMode] = useState<ResponseMode>("balanced");
+  const [loadingSteps, setLoadingSteps] = useState<{ label: string; status: "pending" | "active" | "done" }[]>([]);
   const { toast } = useToast();
 
-  const handleSend = async (content: string, mode: string) => {
+  const handleSend = async (content: string, _mode: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -63,6 +71,14 @@ export default function Chat() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    
+    // Initialize loading steps
+    setLoadingSteps([
+      { label: "Retrieving relevant sources", status: "active" },
+      { label: "Analyzing legal principles", status: "pending" },
+      { label: "Generating response", status: "pending" },
+      { label: "Verifying citations", status: "pending" },
+    ]);
 
     // Prepare messages for API
     const apiMessages: ApiChatMessage[] = messages
@@ -77,13 +93,29 @@ export default function Chat() {
     try {
       await streamLegalChat(
         apiMessages,
-        mode as 'sources-only' | 'balanced' | 'creative' | 'tribunal',
+        responseMode,
         {
           onRAGSources: (sources) => {
             messageRAGSources = sources;
             setCurrentRAGSources(sources);
+            // Update loading steps
+            setLoadingSteps([
+              { label: "Retrieving relevant sources", status: "done" },
+              { label: "Analyzing legal principles", status: "active" },
+              { label: "Generating response", status: "pending" },
+              { label: "Verifying citations", status: "pending" },
+            ]);
           },
           onDelta: (text) => {
+            // Update loading steps when generation starts
+            if (assistantContent === "") {
+              setLoadingSteps([
+                { label: "Retrieving relevant sources", status: "done" },
+                { label: "Analyzing legal principles", status: "done" },
+                { label: "Generating response", status: "active" },
+                { label: "Verifying citations", status: "pending" },
+              ]);
+            }
             assistantContent += text;
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
@@ -109,6 +141,7 @@ export default function Chat() {
           },
           onDone: () => {
             setIsLoading(false);
+            setLoadingSteps([]);
             // Extract citations from the response
             const citations = extractCitations(assistantContent);
             if (citations.length > 0) {
@@ -138,6 +171,7 @@ export default function Chat() {
           },
           onError: (error) => {
             setIsLoading(false);
+            setLoadingSteps([]);
             toast({
               title: "Error",
               description: error.message,
@@ -171,6 +205,19 @@ export default function Chat() {
               </Badge>
             </div>
             <div className="flex items-center gap-2">
+              {/* Mode Selector Popover */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5">
+                    <Settings2 className="w-4 h-4" />
+                    <span className="capitalize">{responseMode.replace('-', ' ')}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  <ModeSelector value={responseMode} onChange={setResponseMode} />
+                </PopoverContent>
+              </Popover>
+              
               <Button variant="ghost" size="sm" className="text-muted-foreground">
                 <History className="w-4 h-4 mr-1.5" />
                 History
@@ -196,29 +243,13 @@ export default function Chat() {
               {messages.map((message) => (
                 <ChatMessage key={message.id} {...message} />
               ))}
-              {isLoading && messages[messages.length - 1]?.role === "user" && (
+              {isLoading && messages[messages.length - 1]?.role === "user" && loadingSteps.length > 0 && (
                 <div className="flex gap-4 p-4">
-                  <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-accent-foreground animate-pulse-subtle" />
+                  <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-accent-foreground animate-pulse" />
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium">Legal AI</span>
-                      <span className="text-xs text-muted-foreground">
-                        Researching...
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" />
-                      <div
-                        className="w-2 h-2 rounded-full bg-primary/40 animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      />
-                      <div
-                        className="w-2 h-2 rounded-full bg-primary/40 animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      />
-                    </div>
+                    <AIResponseLoading steps={loadingSteps} className="border-0 p-0 bg-transparent" />
                   </div>
                 </div>
               )}
