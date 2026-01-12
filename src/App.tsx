@@ -11,6 +11,10 @@ import Documents from "./pages/Documents";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import CaseDetail from "./pages/CaseDetail";
+import Calendar from "./pages/Calendar";
+import Tasks from "./pages/Tasks";
+import Clients from "./pages/Clients";
 
 const queryClient = new QueryClient();
 
