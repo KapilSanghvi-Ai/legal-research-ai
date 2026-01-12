@@ -1,8 +1,10 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientFileUpload } from "@/components/gdrive/ClientFileUpload";
 import {
   FileText,
   Search,
@@ -10,6 +12,8 @@ import {
   FolderOpen,
   Clock,
   Filter,
+  Upload,
+  Files,
 } from "lucide-react";
 
 const documents = [
@@ -82,76 +86,98 @@ export default function Documents() {
           </Button>
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documents..."
-              className="pl-10 bg-card border-border/60"
-            />
-          </div>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="w-4 h-4" />
-            Filter
-          </Button>
-        </div>
+        {/* Tabs for Documents vs Upload */}
+        <Tabs defaultValue="documents" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="documents" className="gap-2">
+              <Files className="w-4 h-4" />
+              Documents
+            </TabsTrigger>
+            <TabsTrigger value="upload" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Upload to Drive
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Documents Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {documents.map((doc) => (
-            <Card
-              key={doc.id}
-              className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-lg bg-primary/10 flex-shrink-0">
-                    <FileText className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
-                      {doc.title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {typeLabels[doc.type] || doc.type}
-                    </p>
-                    <div className="flex items-center gap-2 mt-3">
-                      <Badge
-                        variant="secondary"
-                        className={statusColors[doc.status]}
-                      >
-                        {doc.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <FolderOpen className="w-3 h-3" />
-                        {doc.case}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      {doc.lastModified}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* New Document Card */}
-          <Card className="border-dashed border-2 border-border/60 hover:border-primary/40 transition-colors cursor-pointer group">
-            <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[180px]">
-              <div className="p-3 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
-                <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+          {/* Documents Tab */}
+          <TabsContent value="documents" className="space-y-6">
+            {/* Search and Filters */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search documents..."
+                  className="pl-10 bg-card border-border/60"
+                />
               </div>
-              <p className="mt-3 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                Create New Document
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter className="w-4 h-4" />
+                Filter
+              </Button>
+            </div>
+
+            {/* Documents Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {documents.map((doc) => (
+                <Card
+                  key={doc.id}
+                  className="hover:shadow-elevated transition-all cursor-pointer group border-border/60 hover:border-primary/20"
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-lg bg-primary/10 flex-shrink-0">
+                        <FileText className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                          {doc.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {typeLabels[doc.type] || doc.type}
+                        </p>
+                        <div className="flex items-center gap-2 mt-3">
+                          <Badge
+                            variant="secondary"
+                            className={statusColors[doc.status]}
+                          >
+                            {doc.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <FolderOpen className="w-3 h-3" />
+                            {doc.case}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          {doc.lastModified}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* New Document Card */}
+              <Card className="border-dashed border-2 border-border/60 hover:border-primary/40 transition-colors cursor-pointer group">
+                <CardContent className="p-5 flex flex-col items-center justify-center h-full min-h-[180px]">
+                  <div className="p-3 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
+                    <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    Create New Document
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Upload Tab */}
+          <TabsContent value="upload">
+            <ClientFileUpload />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
