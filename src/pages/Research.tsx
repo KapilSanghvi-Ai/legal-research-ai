@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -26,6 +26,7 @@ import {
   Loader2,
   Brain,
   Globe,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
@@ -35,6 +36,7 @@ import {
   type SemanticSearchResult 
 } from "@/lib/api/search";
 import { useToast } from "@/hooks/use-toast";
+import { KnowledgeSearch } from "@/components/research/KnowledgeSearch";
 
 const recentSearches = [
   "Section 68 cash credits burden of proof",
@@ -61,7 +63,7 @@ export default function Research() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
+  const [searchMode, setSearchMode] = useState<"keyword" | "semantic" | "knowledge">("keyword");
   const { toast } = useToast();
 
   const buildFilters = (pagenum: number = 0) => {
@@ -194,7 +196,7 @@ export default function Research() {
           </div>
 
           {/* Search Mode Toggle */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             <Button
               variant={searchMode === "keyword" ? "default" : "outline"}
               size="sm"
@@ -213,81 +215,102 @@ export default function Research() {
               <Brain className="w-4 h-4" />
               Semantic Search
             </Button>
+            <Button
+              variant={searchMode === "knowledge" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSearchMode("knowledge")}
+              className="gap-2"
+            >
+              <BookOpen className="w-4 h-4" />
+              Knowledge Base
+            </Button>
             {searchMode === "semantic" && (
               <span className="text-xs text-muted-foreground ml-2">
                 Searches cached documents using AI embeddings
               </span>
             )}
+            {searchMode === "knowledge" && (
+              <span className="text-xs text-muted-foreground ml-2">
+                Search Google Drive knowledge base
+              </span>
+            )}
           </div>
 
-          {/* Search Bar */}
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="Search by keywords, section, citation, or case name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-12 h-12 text-base bg-card border-border/60 focus:border-primary/40"
-              />
-            </div>
-            <Button
-              onClick={handleSearch}
-              className="h-12 px-8 bg-primary hover:bg-primary/90"
-              disabled={isSearching}
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                "Search"
+          {/* Knowledge Base Mode */}
+          {searchMode === "knowledge" ? (
+            <KnowledgeSearch />
+          ) : (
+            <>
+              {/* Search Bar */}
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by keywords, section, citation, or case name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="pl-12 h-12 text-base bg-card border-border/60 focus:border-primary/40"
+                  />
+                </div>
+                <Button
+                  onClick={handleSearch}
+                  className="h-12 px-8 bg-primary hover:bg-primary/90"
+                  disabled={isSearching}
+                >
+                  {isSearching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    "Search"
+                  )}
+                </Button>
+              </div>
+
+              {/* Filters - Only show for keyword search */}
+              {searchMode === "keyword" && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Select value={courtFilter} onValueChange={setCourtFilter}>
+                    <SelectTrigger className="w-36">
+                      <Building2 className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Court" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Courts</SelectItem>
+                      <SelectItem value="sc">Supreme Court</SelectItem>
+                      <SelectItem value="hc">High Courts</SelectItem>
+                      <SelectItem value="itat">ITAT</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={yearFilter} onValueChange={setYearFilter}>
+                    <SelectTrigger className="w-36">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                      <SelectItem value="2023">2023</SelectItem>
+                      <SelectItem value="2022">2022</SelectItem>
+                      <SelectItem value="2020-2021">2020-2021</SelectItem>
+                      <SelectItem value="2015-2019">2015-2019</SelectItem>
+                      <SelectItem value="older">Before 2015</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter className="w-4 h-4" />
+                    More Filters
+                  </Button>
+                </div>
               )}
-            </Button>
-          </div>
-
-          {/* Filters - Only show for keyword search */}
-          {searchMode === "keyword" && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <Select value={courtFilter} onValueChange={setCourtFilter}>
-                <SelectTrigger className="w-36">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Court" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Courts</SelectItem>
-                  <SelectItem value="sc">Supreme Court</SelectItem>
-                  <SelectItem value="hc">High Courts</SelectItem>
-                  <SelectItem value="itat">ITAT</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger className="w-36">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Years</SelectItem>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                  <SelectItem value="2020-2021">2020-2021</SelectItem>
-                  <SelectItem value="2015-2019">2015-2019</SelectItem>
-                  <SelectItem value="older">Before 2015</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter className="w-4 h-4" />
-                More Filters
-              </Button>
-            </div>
+            </>
           )}
         </div>
 
-        {/* Results or Suggestions */}
-        {(results.length > 0 || semanticResults.length > 0) ? (
+        {/* Results or Suggestions - Only show for non-knowledge modes */}
+        {searchMode !== "knowledge" && (results.length > 0 || semanticResults.length > 0) ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
