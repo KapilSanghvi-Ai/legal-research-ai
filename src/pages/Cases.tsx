@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
   Search,
@@ -26,114 +27,12 @@ import {
   FileEdit,
   CheckCircle2,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const allCases = [
-  {
-    id: "1",
-    clientName: "Reliance Industries Ltd",
-    clientInitials: "RI",
-    opposingParty: "DCIT, Circle 1(1), Mumbai",
-    assessmentYear: "2021-22",
-    pan: "AAACR5765M",
-    itaNumber: "ITA No. 1234/Mum/2024",
-    stage: "itat" as const,
-    status: "hearing" as const,
-    issues: ["Sec 68", "Sec 69", "Transfer Pricing"],
-    nextDate: "Jan 15, 2026",
-    daysUntilHearing: 3,
-    owner: "Rajesh K.",
-    lastActivity: "2 hours ago",
-  },
-  {
-    id: "2",
-    clientName: "Tata Steel Ltd",
-    opposingParty: "DCIT, Mumbai",
-    assessmentYear: "2020-21",
-    stage: "cita" as const,
-    status: "drafting" as const,
-    issues: ["Sec 40A(3)", "Depreciation"],
-    nextDate: "Jan 22, 2026",
-    daysUntilHearing: 10,
-    owner: "Priya M.",
-    lastActivity: "1 day ago",
-  },
-  {
-    id: "3",
-    clientName: "Infosys Technologies",
-    opposingParty: "ACIT, Bangalore",
-    assessmentYear: "2022-23",
-    stage: "assessment" as const,
-    status: "research" as const,
-    issues: ["Sec 80-IA", "Software Exports"],
-    owner: "Amit S.",
-    lastActivity: "3 hours ago",
-  },
-  {
-    id: "4",
-    clientName: "HDFC Bank Ltd",
-    opposingParty: "DCIT, Mumbai",
-    assessmentYear: "2019-20",
-    stage: "itat" as const,
-    status: "hearing" as const,
-    issues: ["Sec 14A", "Disallowance"],
-    nextDate: "Jan 18, 2026",
-    daysUntilHearing: 6,
-    owner: "Rajesh K.",
-    lastActivity: "5 hours ago",
-  },
-  {
-    id: "5",
-    clientName: "Wipro Ltd",
-    opposingParty: "DCIT, Bangalore",
-    assessmentYear: "2021-22",
-    stage: "cita" as const,
-    status: "drafting" as const,
-    issues: ["Transfer Pricing", "ALP"],
-    nextDate: "Jan 30, 2026",
-    daysUntilHearing: 18,
-    owner: "Priya M.",
-    lastActivity: "Yesterday",
-  },
-  {
-    id: "6",
-    clientName: "Bajaj Auto Ltd",
-    opposingParty: "ITO, Pune",
-    assessmentYear: "2020-21",
-    stage: "closed" as const,
-    status: "archived" as const,
-    issues: ["Sec 37", "Business Expenditure"],
-    owner: "Amit S.",
-    lastActivity: "1 week ago",
-  },
-  {
-    id: "7",
-    clientName: "Sun Pharma Industries",
-    opposingParty: "DCIT, Mumbai",
-    assessmentYear: "2022-23",
-    stage: "assessment" as const,
-    status: "research" as const,
-    issues: ["Sec 35", "R&D Expenditure"],
-    nextDate: "Feb 10, 2026",
-    daysUntilHearing: 29,
-    owner: "Rajesh K.",
-    lastActivity: "4 hours ago",
-  },
-  {
-    id: "8",
-    clientName: "Mahindra & Mahindra",
-    opposingParty: "DCIT, Mumbai",
-    assessmentYear: "2021-22",
-    stage: "cita" as const,
-    status: "hearing" as const,
-    issues: ["Sec 32", "Additional Depreciation"],
-    nextDate: "Jan 25, 2026",
-    daysUntilHearing: 13,
-    owner: "Priya M.",
-    lastActivity: "6 hours ago",
-  },
-];
+import { useCases, CaseWithMeta } from "@/hooks/use-cases";
+import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -141,9 +40,10 @@ interface StatCardProps {
   value: number;
   trend?: string;
   iconBg: string;
+  isLoading?: boolean;
 }
 
-function StatCard({ icon, label, value, trend, iconBg }: StatCardProps) {
+function StatCard({ icon, label, value, trend, iconBg, isLoading }: StatCardProps) {
   return (
     <Card className="border-border/40 hover:border-border/60 transition-colors">
       <CardContent className="p-4 flex items-center gap-4">
@@ -155,12 +55,18 @@ function StatCard({ icon, label, value, trend, iconBg }: StatCardProps) {
             {label}
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-foreground">{value}</span>
-            {trend && (
-              <span className="text-xs text-success flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" />
-                {trend}
-              </span>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <>
+                <span className="text-2xl font-semibold text-foreground">{value}</span>
+                {trend && (
+                  <span className="text-xs text-success flex items-center gap-0.5">
+                    <TrendingUp className="w-3 h-3" />
+                    {trend}
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -169,23 +75,99 @@ function StatCard({ icon, label, value, trend, iconBg }: StatCardProps) {
   );
 }
 
+// Transform database case to card-compatible format
+function toCaseCardProps(dbCase: CaseWithMeta) {
+  return {
+    id: dbCase.id,
+    clientName: dbCase.client_name,
+    clientInitials: dbCase.client_name.split(" ").map((w) => w[0]).join("").slice(0, 2),
+    opposingParty: dbCase.opposing_party || "Department",
+    assessmentYear: dbCase.assessment_year,
+    pan: dbCase.client_pan || undefined,
+    itaNumber: dbCase.ita_number || undefined,
+    stage: dbCase.stage,
+    status: dbCase.status,
+    issues: dbCase.issuesList,
+    nextDate: dbCase.next_hearing_date 
+      ? format(new Date(dbCase.next_hearing_date), "MMM d, yyyy") 
+      : undefined,
+    daysUntilHearing: dbCase.daysUntilHearing,
+    owner: "You", // Will be enhanced with profiles later
+    lastActivity: format(new Date(dbCase.updated_at), "MMM d, h:mm a"),
+  };
+}
+
+function CaseCardSkeleton() {
+  return (
+    <Card className="border-border/40">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <Skeleton className="w-11 h-11 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        </div>
+        <Skeleton className="h-4 w-1/3" />
+        <div className="flex gap-2">
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+        <div className="flex gap-1.5">
+          <Skeleton className="h-6 w-16" />
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-6 w-14" />
+        </div>
+        <Skeleton className="h-16 w-full rounded-lg" />
+        <div className="flex items-center justify-between pt-3 border-t border-border/40">
+          <Skeleton className="h-4 w-24" />
+          <div className="flex gap-1">
+            <Skeleton className="h-2 w-2 rounded-full" />
+            <Skeleton className="h-2 w-2 rounded-full" />
+            <Skeleton className="h-2 w-2 rounded-full" />
+            <Skeleton className="h-2 w-2 rounded-full" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Cases() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"dashboard" | "grid" | "list">("dashboard");
 
-  const filteredCases = allCases.filter((c) => {
-    const matchesSearch =
-      c.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.issues.some((i) => i.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStage = stageFilter === "all" || c.stage === stageFilter;
-    return matchesSearch && matchesStage;
+  // Fetch cases from database
+  const { 
+    data: allCases = [], 
+    isLoading, 
+    error, 
+    refetch,
+    isRefetching 
+  } = useCases({
+    includeArchived: true,
+    stageFilter: stageFilter === "all" ? undefined : stageFilter,
+    searchQuery,
   });
 
-  const activeCases = filteredCases.filter((c) => c.stage !== "closed");
-  const archivedCases = filteredCases.filter((c) => c.stage === "closed");
-  const urgentCases = activeCases.filter((c) => c.daysUntilHearing && c.daysUntilHearing <= 7);
+  const activeCases = allCases.filter((c) => c.stage !== "closed");
+  const archivedCases = allCases.filter((c) => c.stage === "closed");
+  const urgentCases = activeCases.filter((c) => c.daysUntilHearing !== undefined && c.daysUntilHearing <= 7);
   const draftingCases = activeCases.filter((c) => c.status === "drafting");
+  const myCases = activeCases.filter((c) => c.owner_id === user?.id || c.created_by === user?.id);
+
+  // Transform for card components
+  const activeCaseCards = activeCases.map(toCaseCardProps);
+  const archivedCaseCards = archivedCases.map(toCaseCardProps);
+  const myCaseCards = myCases.map(toCaseCardProps);
+
+  // Transform for dashboard
+  const dashboardCases = activeCases.map((c) => ({
+    ...toCaseCardProps(c),
+    completionPercent: 0,
+  }));
 
   return (
     <AppLayout title="Cases">
@@ -207,25 +189,28 @@ export default function Cases() {
             label="Active Cases"
             value={activeCases.length}
             iconBg="bg-primary/10"
+            isLoading={isLoading}
           />
           <StatCard
             icon={<AlertTriangle className="w-5 h-5 text-warning" />}
             label="Urgent"
             value={urgentCases.length}
             iconBg="bg-warning/10"
+            isLoading={isLoading}
           />
           <StatCard
             icon={<FileEdit className="w-5 h-5 text-info" />}
             label="Drafting"
             value={draftingCases.length}
             iconBg="bg-info/10"
+            isLoading={isLoading}
           />
           <StatCard
             icon={<CheckCircle2 className="w-5 h-5 text-success" />}
             label="Closed"
             value={archivedCases.length}
-            trend="+2 this month"
             iconBg="bg-success/10"
+            isLoading={isLoading}
           />
         </div>
 
@@ -257,8 +242,14 @@ export default function Cases() {
                     <SelectItem value="closed">Closed</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" className="border-border/60 hover:bg-muted">
-                  <SlidersHorizontal className="w-4 h-4" />
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="border-border/60 hover:bg-muted"
+                  onClick={() => refetch()}
+                  disabled={isRefetching}
+                >
+                  <RefreshCw className={cn("w-4 h-4", isRefetching && "animate-spin")} />
                 </Button>
               </div>
               
@@ -314,17 +305,54 @@ export default function Cases() {
           </CardContent>
         </Card>
 
+        {/* Error State */}
+        {error && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="flex items-center justify-center py-8 text-center">
+              <div>
+                <p className="text-destructive font-medium">Failed to load cases</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {error instanceof Error ? error.message : "Please try again"}
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={() => refetch()}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {isLoading && viewMode !== "dashboard" && (
+          <Card className="border-border/40">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <CaseCardSkeleton key={i} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Dashboard View */}
-        {viewMode === "dashboard" && (
+        {viewMode === "dashboard" && !error && (
           <CaseDashboard
-            cases={activeCases}
+            cases={dashboardCases}
+            isLoading={isLoading}
             onNewCase={() => {}}
             onCaseClick={(id) => console.log("Open case:", id)}
           />
         )}
 
         {/* Grid/List View */}
-        {(viewMode === "grid" || viewMode === "list") && (
+        {(viewMode === "grid" || viewMode === "list") && !isLoading && !error && (
           <Card className="border-border/40">
             <CardContent className="p-0">
               <Tabs defaultValue="active" className="w-full">
@@ -344,6 +372,9 @@ export default function Cases() {
                       className="h-12 px-0 pb-3 pt-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none font-medium"
                     >
                       My Cases
+                      <span className="ml-2 px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-full font-medium">
+                        {myCases.length}
+                      </span>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="pending-review"
@@ -365,75 +396,91 @@ export default function Cases() {
 
                 <div className="p-6">
                   <TabsContent value="active" className="mt-0">
-                    <div className={viewMode === "grid" 
-                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-                      : "space-y-4"
-                    }>
-                      {activeCases.map((caseItem, index) => (
-                        <div 
-                          key={caseItem.id}
-                          className="animate-fade-in"
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <EnhancedCaseCard
-                            {...caseItem}
-                            onOpen={() => console.log("Open:", caseItem.id)}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    {activeCaseCards.length > 0 ? (
+                      <div className={viewMode === "grid" 
+                        ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+                        : "space-y-4"
+                      }>
+                        {activeCaseCards.map((caseItem, index) => (
+                          <div 
+                            key={caseItem.id}
+                            className="animate-fade-in"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <EnhancedCaseCard
+                              {...caseItem}
+                              onOpen={() => console.log("Open:", caseItem.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState 
+                        message="No active cases" 
+                        description="Create your first case to get started"
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="my-cases" className="mt-0">
-                    <div className={viewMode === "grid" 
-                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-                      : "space-y-4"
-                    }>
-                      {activeCases.filter(c => c.owner === "Rajesh K.").map((caseItem, index) => (
-                        <div 
-                          key={caseItem.id}
-                          className="animate-fade-in"
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <EnhancedCaseCard
-                            {...caseItem}
-                            onOpen={() => console.log("Open:", caseItem.id)}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    {myCaseCards.length > 0 ? (
+                      <div className={viewMode === "grid" 
+                        ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+                        : "space-y-4"
+                      }>
+                        {myCaseCards.map((caseItem, index) => (
+                          <div 
+                            key={caseItem.id}
+                            className="animate-fade-in"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <EnhancedCaseCard
+                              {...caseItem}
+                              onOpen={() => console.log("Open:", caseItem.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState 
+                        message="No cases assigned to you" 
+                        description="Cases where you are the owner or creator will appear here"
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="pending-review" className="mt-0">
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                        <CheckCircle2 className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground font-medium">No cases pending review</p>
-                      <p className="text-sm text-muted-foreground/70 mt-1">
-                        Cases requiring your review will appear here
-                      </p>
-                    </div>
+                    <EmptyState 
+                      message="No cases pending review" 
+                      description="Cases requiring your review will appear here"
+                    />
                   </TabsContent>
 
                   <TabsContent value="archived" className="mt-0">
-                    <div className={viewMode === "grid" 
-                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-                      : "space-y-4"
-                    }>
-                      {archivedCases.map((caseItem, index) => (
-                        <div 
-                          key={caseItem.id}
-                          className="animate-fade-in"
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <EnhancedCaseCard
-                            {...caseItem}
-                            onOpen={() => console.log("Open:", caseItem.id)}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    {archivedCaseCards.length > 0 ? (
+                      <div className={viewMode === "grid" 
+                        ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+                        : "space-y-4"
+                      }>
+                        {archivedCaseCards.map((caseItem, index) => (
+                          <div 
+                            key={caseItem.id}
+                            className="animate-fade-in"
+                            style={{ animationDelay: `${index * 50}ms` }}
+                          >
+                            <EnhancedCaseCard
+                              {...caseItem}
+                              onOpen={() => console.log("Open:", caseItem.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState 
+                        message="No archived cases" 
+                        description="Closed cases will appear here"
+                      />
+                    )}
                   </TabsContent>
                 </div>
               </Tabs>
@@ -441,14 +488,15 @@ export default function Cases() {
           </Card>
         )}
 
-        {filteredCases.length === 0 && viewMode !== "dashboard" && (
+        {/* Empty State when no filter results */}
+        {!isLoading && !error && allCases.length === 0 && searchQuery && (
           <Card className="border-border/40">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                 <Search className="w-6 h-6 text-muted-foreground" />
               </div>
               <p className="text-muted-foreground font-medium">
-                No cases found matching your criteria
+                No cases found matching "{searchQuery}"
               </p>
               <p className="text-sm text-muted-foreground/70 mt-1">
                 Try adjusting your search or filter settings
@@ -464,5 +512,17 @@ export default function Cases() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function EmptyState({ message, description }: { message: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        <CheckCircle2 className="w-6 h-6 text-muted-foreground" />
+      </div>
+      <p className="text-muted-foreground font-medium">{message}</p>
+      <p className="text-sm text-muted-foreground/70 mt-1">{description}</p>
+    </div>
   );
 }

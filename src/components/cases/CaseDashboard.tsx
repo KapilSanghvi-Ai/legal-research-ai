@@ -2,6 +2,7 @@ import { EnhancedCaseCard } from "@/components/dashboard/EnhancedCaseCard";
 import { AlertTriangle, FileEdit, Search, Plus, Gavel, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface CaseData {
@@ -24,6 +25,7 @@ interface CaseData {
 
 interface CaseDashboardProps {
   cases: CaseData[];
+  isLoading?: boolean;
   onNewCase?: () => void;
   onCaseClick?: (caseId: string) => void;
 }
@@ -37,6 +39,45 @@ interface CaseSectionProps {
   borderColor?: string;
   onCaseClick?: (caseId: string) => void;
   emptyMessage?: string;
+  isLoading?: boolean;
+}
+
+function CaseSectionSkeleton() {
+  return (
+    <Card className="border-border/40">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-9 h-9 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="border-border/40">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="w-11 h-11 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                </div>
+                <Skeleton className="h-4 w-1/3" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-6 w-16" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function CaseSection({ 
@@ -47,8 +88,13 @@ function CaseSection({
   iconClass, 
   borderColor,
   onCaseClick,
-  emptyMessage 
+  emptyMessage,
+  isLoading 
 }: CaseSectionProps) {
+  if (isLoading) {
+    return <CaseSectionSkeleton />;
+  }
+
   return (
     <Card className={cn("border-border/40", borderColor)}>
       <CardHeader className="pb-4">
@@ -102,7 +148,7 @@ function CaseSection({
   );
 }
 
-export function CaseDashboard({ cases, onNewCase, onCaseClick }: CaseDashboardProps) {
+export function CaseDashboard({ cases, isLoading, onNewCase, onCaseClick }: CaseDashboardProps) {
   // Categorize cases
   const urgentCases = cases.filter(
     (c) => c.daysUntilHearing !== undefined && c.daysUntilHearing <= 7 && c.stage !== "closed"
@@ -119,6 +165,18 @@ export function CaseDashboard({ cases, onNewCase, onCaseClick }: CaseDashboardPr
   const hearingCases = cases.filter(
     (c) => c.status === "hearing" && !urgentCases.includes(c)
   );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <CaseSectionSkeleton />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <CaseSectionSkeleton />
+          <CaseSectionSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
