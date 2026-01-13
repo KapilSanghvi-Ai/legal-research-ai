@@ -2,11 +2,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Google Drive Folder IDs
 export const GDRIVE_FOLDERS = {
-  CLIENT_DATA: "1P5nEAwpxZagdu2y1wmlzFe7VNlaCo5lF",
-  TEMPLATES: "13DUOGS4oczXIyXmt_n_HfhlgibpYOHdB",
-  KNOWLEDGE_BASE: "1zdKcTaFQnXAwEqwM_wlf7n3SOwMqtaEs",
+  CLIENT_DATA: import.meta.env.VITE_GDRIVE_CLIENT_DATA_FOLDER || "",
+  TEMPLATES: import.meta.env.VITE_GDRIVE_TEMPLATES_FOLDER || "",
+  KNOWLEDGE_BASE: import.meta.env.VITE_GDRIVE_KNOWLEDGE_FOLDER || "",
 } as const;
-
 export interface GDriveFile {
   id: string;
   name: string;
@@ -123,11 +122,11 @@ export const gdriveApi = {
   // Create client folder structure
   async createClientFolder(clientName: string, clientId: string): Promise<GDriveFolder> {
     const { data, error } = await supabase.functions.invoke("gdrive-client-folder", {
-      body: { 
-        action: "createClientStructure", 
-        clientName, 
+      body: {
+        action: "createClientStructure",
+        clientName,
         clientId,
-        parentId: GDRIVE_FOLDERS.CLIENT_DATA 
+        parentId: GDRIVE_FOLDERS.CLIENT_DATA,
       },
     });
 
