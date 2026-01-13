@@ -6,6 +6,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Authentication helper - validates JWT and returns user
+async function authenticateRequest(req: Request): Promise<{ user: any; error: Response | null }> {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return {
+      user: null,
+      error: new Response(
+        JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    };
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return {
+      user: null,
+      error: new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    };
+  }
+
+  return { user: data.user, error: null };
+}
+
 interface SemanticSearchResult {
   id: string;
   sourceId: string;
@@ -22,6 +58,14 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate the request
+    const { user, error: authError } = await authenticateRequest(req);
+    if (authError) {
+      return authError;
+    }
+
+    console.log(`Authenticated user: ${user.email}`);
+
     const { query, matchThreshold = 0.75, matchCount = 10 } = await req.json();
 
     if (!query || typeof query !== 'string') {
@@ -30,6 +74,18 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Validate query length
+    if (query.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: 'Query exceeds maximum length of 2000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate matchCount and matchThreshold
+    const safeMatchCount = Math.min(Math.max(1, matchCount), 100);
+    const safeMatchThreshold = Math.min(Math.max(0, matchThreshold), 1);
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -66,7 +122,7 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    console.log(`Embedding generated, searching ${matchCount} matches with threshold ${matchThreshold}`);
+    console.log(`Embedding generated, searching ${safeMatchCount} matches with threshold ${safeMatchThreshold}`);
 
     // Create Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -74,8 +130,8 @@ serve(async (req) => {
     // Call the match_source_fragments function
     const { data: fragments, error: searchError } = await supabase.rpc('match_source_fragments', {
       query_embedding: JSON.stringify(queryEmbedding),
-      match_threshold: matchThreshold,
-      match_count: matchCount,
+      match_threshold: safeMatchThreshold,
+      match_count: safeMatchCount,
     });
 
     if (searchError) {

@@ -6,6 +6,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Authentication helper - validates JWT and returns user
+async function authenticateRequest(req: Request): Promise<{ user: any; error: Response | null }> {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return {
+      user: null,
+      error: new Response(
+        JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    };
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return {
+      user: null,
+      error: new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    };
+  }
+
+  return { user: data.user, error: null };
+}
+
 // Legal research knowledge base
 const LEGAL_CONTEXT = `
 You are a legal research assistant specialized in Indian tax law and litigation. You help legal professionals research case law, analyze judgments, and prepare litigation documents.
@@ -183,6 +219,14 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate the request
+    const { user, error: authError } = await authenticateRequest(req);
+    if (authError) {
+      return authError;
+    }
+
+    console.log(`Authenticated user: ${user.email}`);
+
     const { messages, mode = 'balanced', sessionId } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
