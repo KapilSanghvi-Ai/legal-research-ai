@@ -1,6 +1,7 @@
 import { EnhancedCaseCard } from "@/components/dashboard/EnhancedCaseCard";
-import { AlertTriangle, FileEdit, Search, Plus } from "lucide-react";
+import { AlertTriangle, FileEdit, Search, Plus, Gavel, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface CaseData {
@@ -29,36 +30,75 @@ interface CaseDashboardProps {
 
 interface CaseSectionProps {
   title: string;
+  description?: string;
   icon: React.ReactNode;
   cases: CaseData[];
   iconClass?: string;
+  borderColor?: string;
   onCaseClick?: (caseId: string) => void;
+  emptyMessage?: string;
 }
 
-function CaseSection({ title, icon, cases, iconClass, onCaseClick }: CaseSectionProps) {
-  if (cases.length === 0) return null;
-
+function CaseSection({ 
+  title, 
+  description,
+  icon, 
+  cases, 
+  iconClass, 
+  borderColor,
+  onCaseClick,
+  emptyMessage 
+}: CaseSectionProps) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className={cn("flex items-center justify-center", iconClass)}>
-          {icon}
-        </span>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-          {title}
-        </h3>
-        <span className="text-xs text-muted-foreground">({cases.length})</span>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cases.map((caseItem) => (
-          <EnhancedCaseCard
-            key={caseItem.id}
-            {...caseItem}
-            onOpen={() => onCaseClick?.(caseItem.id)}
-          />
-        ))}
-      </div>
-    </div>
+    <Card className={cn("border-border/40", borderColor)}>
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "p-2 rounded-lg",
+              iconClass
+            )}>
+              {icon}
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                {title}
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {cases.length}
+                </span>
+              </CardTitle>
+              {description && (
+                <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {cases.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {cases.map((caseItem, index) => (
+              <div 
+                key={caseItem.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <EnhancedCaseCard
+                  {...caseItem}
+                  onOpen={() => onCaseClick?.(caseItem.id)}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              {emptyMessage || "No cases in this category"}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -81,59 +121,74 @@ export function CaseDashboard({ cases, onNewCase, onCaseClick }: CaseDashboardPr
   );
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-heading font-semibold">My Cases</h2>
-        <Button onClick={onNewCase} className="gap-2">
-          <Plus className="w-4 h-4" />
-          New Case
-        </Button>
-      </div>
-
-      {/* Case Sections */}
-      <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Urgent Section */}
+      {urgentCases.length > 0 && (
         <CaseSection
-          title="Urgent (Hearings in 7 days)"
-          icon={<AlertTriangle className="w-4 h-4" />}
-          iconClass="text-warning"
+          title="Urgent Attention Required"
+          description="Cases with hearings scheduled within the next 7 days"
+          icon={<AlertTriangle className="w-5 h-5 text-warning" />}
+          iconClass="bg-warning/10"
+          borderColor="border-l-4 border-l-warning"
           cases={urgentCases}
           onCaseClick={onCaseClick}
         />
+      )}
 
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <CaseSection
           title="Drafting in Progress"
-          icon={<FileEdit className="w-4 h-4" />}
-          iconClass="text-info"
+          description="Documents being prepared"
+          icon={<FileEdit className="w-5 h-5 text-info" />}
+          iconClass="bg-info/10"
           cases={draftingCases}
           onCaseClick={onCaseClick}
+          emptyMessage="No cases currently in drafting stage"
         />
 
         <CaseSection
           title="Research Phase"
-          icon={<Search className="w-4 h-4" />}
-          iconClass="text-purple-500"
+          description="Legal research ongoing"
+          icon={<BookOpen className="w-5 h-5 text-purple-500" />}
+          iconClass="bg-purple-500/10"
           cases={researchCases}
           onCaseClick={onCaseClick}
-        />
-
-        <CaseSection
-          title="Hearing Phase"
-          icon={<AlertTriangle className="w-4 h-4" />}
-          iconClass="text-accent"
-          cases={hearingCases}
-          onCaseClick={onCaseClick}
+          emptyMessage="No cases in research phase"
         />
       </div>
 
+      {/* Hearing Cases */}
+      {hearingCases.length > 0 && (
+        <CaseSection
+          title="Hearing Phase"
+          description="Cases currently being heard"
+          icon={<Gavel className="w-5 h-5 text-accent" />}
+          iconClass="bg-accent/10"
+          cases={hearingCases}
+          onCaseClick={onCaseClick}
+        />
+      )}
+
+      {/* Empty State */}
       {cases.length === 0 && (
-        <div className="text-center py-12 bg-card rounded-lg border border-border">
-          <p className="text-muted-foreground mb-4">No cases found</p>
-          <Button onClick={onNewCase} variant="outline">
-            <Plus className="w-4 h-4 mr-2" />
-            Create your first case
-          </Button>
-        </div>
+        <Card className="border-border/40 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <Search className="w-7 h-7 text-muted-foreground" />
+            </div>
+            <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
+              No cases yet
+            </h3>
+            <p className="text-muted-foreground max-w-sm mb-6">
+              Get started by creating your first case. All your litigation matters will be organized here.
+            </p>
+            <Button onClick={onNewCase} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Your First Case
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
