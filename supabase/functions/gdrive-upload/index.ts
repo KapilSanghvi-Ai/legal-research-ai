@@ -8,34 +8,32 @@ const corsHeaders = {
 
 // Authentication helper - validates JWT and returns user
 async function authenticateRequest(req: Request): Promise<{ user: any; error: Response | null }> {
-  const authHeader = req.headers.get('Authorization');
-  
-  if (!authHeader?.startsWith('Bearer ')) {
+  const authHeader = req.headers.get("Authorization");
+
+  if (!authHeader?.startsWith("Bearer ")) {
     return {
       user: null,
-      error: new Response(
-        JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      error: new Response(JSON.stringify({ error: "Unauthorized - Missing or invalid authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
     };
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
 
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.replace("Bearer ", "");
   const { data, error } = await supabase.auth.getUser(token);
 
   if (error || !data?.user) {
     return {
       user: null,
-      error: new Response(
-        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      error: new Response(JSON.stringify({ error: "Unauthorized - Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
     };
   }
 
@@ -44,7 +42,7 @@ async function authenticateRequest(req: Request): Promise<{ user: any; error: Re
 
 async function getAccessToken(serviceAccountKey: string): Promise<string> {
   const key = JSON.parse(serviceAccountKey);
-  
+
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
@@ -62,26 +60,19 @@ async function getAccessToken(serviceAccountKey: string): Promise<string> {
 
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
   const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = key.private_key
-    .replace(pemHeader, "")
-    .replace(pemFooter, "")
-    .replace(/\s/g, "");
-  
+  const pemContents = key.private_key.replace(pemHeader, "").replace(pemFooter, "").replace(/\s/g, "");
+
   const binaryKey = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     binaryKey,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
-    ["sign"]
+    ["sign"],
   );
 
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    cryptoKey,
-    encoder.encode(unsignedToken)
-  );
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, encoder.encode(unsignedToken));
 
   const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
     .replace(/\+/g, "-")
@@ -123,12 +114,12 @@ serve(async (req) => {
     }
 
     const accessToken = await getAccessToken(serviceAccountKey);
-    
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folderId = formData.get("folderId") as string;
-    const fileName = (formData.get("fileName") as string || file.name).substring(0, 255);
-    const description = (formData.get("description") as string || "").substring(0, 1000);
+    const fileName = ((formData.get("fileName") as string) || file.name).substring(0, 255);
+    const description = ((formData.get("description") as string) || "").substring(0, 1000);
 
     if (!file || !folderId) {
       throw new Error("File and folderId are required");
@@ -139,12 +130,17 @@ serve(async (req) => {
       throw new Error(`File exceeds maximum size of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
     }
 
+    // Validate file type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      throw new Error(`File type ${file.type} not allowed. Permitted: PDF, DOC, DOCX, TXT, JPG, PNG`);
+    }
+
     // Create file metadata
     const metadata: Record<string, unknown> = {
       name: fileName,
       parents: [folderId],
     };
-    
+
     if (description) {
       metadata.description = description;
     }
@@ -157,10 +153,7 @@ serve(async (req) => {
     const fileBuffer = await file.arrayBuffer();
     const fileBytes = new Uint8Array(fileBuffer);
 
-    const metadataPart = 
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata);
+    const metadataPart = delimiter + "Content-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata);
 
     const mediaPart =
       delimiter +
@@ -173,10 +166,8 @@ serve(async (req) => {
     const mediaHeaderBytes = encoder.encode(mediaPart);
     const closeBytes = encoder.encode(closeDelimiter);
 
-    const body = new Uint8Array(
-      metadataBytes.length + mediaHeaderBytes.length + fileBytes.length + closeBytes.length
-    );
-    
+    const body = new Uint8Array(metadataBytes.length + mediaHeaderBytes.length + fileBytes.length + closeBytes.length);
+
     let offset = 0;
     body.set(metadataBytes, offset);
     offset += metadataBytes.length;
@@ -195,7 +186,7 @@ serve(async (req) => {
           "Content-Type": `multipart/related; boundary=${boundary}`,
         },
         body,
-      }
+      },
     );
 
     if (!response.ok) {
@@ -210,12 +201,9 @@ serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
