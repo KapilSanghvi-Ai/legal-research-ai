@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Cases from "./pages/Cases";
+import CaseDetail from "./pages/CaseDetail";
 import Research from "./pages/Research";
 import Chat from "./pages/Chat";
 import Documents from "./pages/Documents";
@@ -34,6 +35,7 @@ const App = () => (
             {/* Protected routes */}
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/cases" element={<ProtectedRoute><Cases /></ProtectedRoute>} />
+            <Route path="/cases/:caseId" element={<ProtectedRoute><CaseDetail /></ProtectedRoute>} />
             <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
             <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
             <Route path="/hearings" element={<ProtectedRoute><Hearings /></ProtectedRoute>} />
