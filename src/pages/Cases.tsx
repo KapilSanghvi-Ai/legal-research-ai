@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CaseDashboard } from "@/components/cases/CaseDashboard";
+import { CreateCaseDialog } from "@/components/cases/CreateCaseDialog";
 import { EnhancedCaseCard } from "@/components/dashboard/EnhancedCaseCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ import {
   Upload,
   LayoutGrid,
   List,
-  SlidersHorizontal,
   Briefcase,
   AlertTriangle,
   FileEdit,
@@ -296,10 +296,12 @@ export default function Cases() {
                   <Upload className="w-4 h-4 mr-2" />
                   Import
                 </Button>
-                <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Case
-                </Button>
+                <CreateCaseDialog>
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Case
+                  </Button>
+                </CreateCaseDialog>
               </div>
             </div>
           </CardContent>
