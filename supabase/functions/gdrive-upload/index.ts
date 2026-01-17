@@ -94,6 +94,16 @@ async function getAccessToken(serviceAccountKey: string): Promise<string> {
 // Max file size: 50MB
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
+// Allowed MIME types
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "image/jpeg",
+  "image/png",
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
