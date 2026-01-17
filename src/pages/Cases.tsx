@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CaseDashboard } from "@/components/cases/CaseDashboard";
 import { CreateCaseDialog } from "@/components/cases/CreateCaseDialog";
@@ -135,6 +136,7 @@ function CaseCardSkeleton() {
 
 export default function Cases() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"dashboard" | "grid" | "list">("dashboard");
@@ -349,7 +351,7 @@ export default function Cases() {
             cases={dashboardCases}
             isLoading={isLoading}
             onNewCase={() => {}}
-            onCaseClick={(id) => console.log("Open case:", id)}
+            onCaseClick={(id) => navigate(`/cases/${id}`)}
           />
         )}
 
@@ -411,7 +413,7 @@ export default function Cases() {
                           >
                             <EnhancedCaseCard
                               {...caseItem}
-                              onOpen={() => console.log("Open:", caseItem.id)}
+                              onOpen={() => navigate(`/cases/${caseItem.id}`)}
                             />
                           </div>
                         ))}
@@ -438,7 +440,7 @@ export default function Cases() {
                           >
                             <EnhancedCaseCard
                               {...caseItem}
-                              onOpen={() => console.log("Open:", caseItem.id)}
+                              onOpen={() => navigate(`/cases/${caseItem.id}`)}
                             />
                           </div>
                         ))}
@@ -472,7 +474,7 @@ export default function Cases() {
                           >
                             <EnhancedCaseCard
                               {...caseItem}
-                              onOpen={() => console.log("Open:", caseItem.id)}
+                              onOpen={() => navigate(`/cases/${caseItem.id}`)}
                             />
                           </div>
                         ))}
