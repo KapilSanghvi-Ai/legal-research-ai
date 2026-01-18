@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CaseDocumentUpload } from "@/components/cases/CaseDocumentUpload";
+import { EditCaseDialog } from "@/components/cases/EditCaseDialog";
 import {
   ArrowLeft,
   Briefcase,
@@ -74,6 +75,7 @@ export default function CaseDetail() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: caseData, isLoading: caseLoading, error: caseError } = useCase(caseId || "");
   const { data: activities = [], isLoading: activitiesLoading } = useCaseActivities(caseId || "");
@@ -195,7 +197,7 @@ export default function CaseDetail() {
               <Upload className="h-4 w-4 mr-2" />
               Upload
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -664,6 +666,13 @@ export default function CaseDetail() {
         caseId={caseId || ""}
         caseName={`${caseData.client_name}_AY${caseData.assessment_year}`}
         gdriveFolderId={caseData.gdrive_folder_id}
+      />
+
+      {/* Edit Case Dialog */}
+      <EditCaseDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        caseData={caseData}
       />
     </AppLayout>
   );
