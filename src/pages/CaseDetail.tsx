@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useCase } from "@/hooks/use-cases";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CaseDocumentUpload } from "@/components/cases/CaseDocumentUpload";
 import {
   ArrowLeft,
   Briefcase,
@@ -31,6 +33,7 @@ import {
   Scale,
   Plus,
   FolderOpen,
+  Upload,
 } from "lucide-react";
 import { format, formatDistanceToNow, parseISO, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -70,6 +73,7 @@ const priorityConfig = {
 export default function CaseDetail() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const { data: caseData, isLoading: caseLoading, error: caseError } = useCase(caseId || "");
   const { data: activities = [], isLoading: activitiesLoading } = useCaseActivities(caseId || "");
@@ -187,6 +191,10 @@ export default function CaseDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload
+            </Button>
             <Button variant="outline" size="sm">
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -355,6 +363,14 @@ export default function CaseDetail() {
                             </Button>
                           </div>
                         ))}
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2" 
+                          onClick={() => setUploadDialogOpen(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Document
+                        </Button>
                       </div>
                     ) : (
                       <EmptySection
@@ -362,6 +378,7 @@ export default function CaseDetail() {
                         title="No documents yet"
                         description="Documents related to this case will appear here"
                         actionLabel="Add Document"
+                        onAction={() => setUploadDialogOpen(true)}
                       />
                     )}
                   </TabsContent>
@@ -639,6 +656,15 @@ export default function CaseDetail() {
           </div>
         </div>
       </div>
+
+      {/* Document Upload Dialog */}
+      <CaseDocumentUpload
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        caseId={caseId || ""}
+        caseName={`${caseData.client_name}_AY${caseData.assessment_year}`}
+        gdriveFolderId={caseData.gdrive_folder_id}
+      />
     </AppLayout>
   );
 }
@@ -674,12 +700,14 @@ function EmptySection({
   icon, 
   title, 
   description, 
-  actionLabel 
+  actionLabel,
+  onAction 
 }: { 
   icon: React.ReactNode; 
   title: string; 
   description: string; 
   actionLabel: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -688,7 +716,7 @@ function EmptySection({
       </div>
       <p className="font-medium text-foreground">{title}</p>
       <p className="text-sm text-muted-foreground mt-1">{description}</p>
-      <Button variant="outline" size="sm" className="mt-4">
+      <Button variant="outline" size="sm" className="mt-4" onClick={onAction}>
         <Plus className="h-4 w-4 mr-2" />
         {actionLabel}
       </Button>
