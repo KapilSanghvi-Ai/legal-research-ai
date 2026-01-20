@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useCase } from "@/hooks/use-cases";
-import { useHearings } from "@/hooks/use-litigation";
-import { useCaseActivities, useCaseDocuments, useCaseTasks, useCaseResearch } from "@/hooks/use-case-details";
+import { useHearings, useUpdateTask } from "@/hooks/use-litigation";
+import { useCaseActivities, useCaseDocuments, useCaseTasks, useCaseResearch, Task } from "@/hooks/use-case-details";
+import { useQueryClient } from "@tanstack/react-query";
+import { caseDetailKeys } from "@/hooks/use-case-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CaseDocumentUpload } from "@/components/cases/CaseDocumentUpload";
 import { EditCaseDialog } from "@/components/cases/EditCaseDialog";
+import { CreateTaskDialog } from "@/components/cases/CreateTaskDialog";
 import {
   ArrowLeft,
   Briefcase,
@@ -74,10 +78,14 @@ const priorityConfig = {
 export default function CaseDetail() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const { data: caseData, isLoading: caseLoading, error: caseError } = useCase(caseId || "");
+  const updateTask = useUpdateTask();
   const { data: activities = [], isLoading: activitiesLoading } = useCaseActivities(caseId || "");
   const { data: documents = [], isLoading: documentsLoading } = useCaseDocuments(caseId || "");
   const { data: tasks = [], isLoading: tasksLoading } = useCaseTasks(caseId || "");
@@ -136,6 +144,30 @@ export default function CaseDetail() {
   const pendingTasks = tasks.filter(t => t.status === "pending" || t.status === "in_progress");
   const completedTasks = tasks.filter(t => t.status === "completed");
   const taskProgress = tasks.length > 0 ? (completedTasks.length / tasks.length) * 100 : 0;
+
+  const handleToggleTaskComplete = async (task: Task) => {
+    const newStatus = task.status === "completed" ? "pending" : "completed";
+    try {
+      await updateTask.mutateAsync({ 
+        id: task.id, 
+        status: newStatus,
+        completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+      });
+      queryClient.invalidateQueries({ queryKey: caseDetailKeys.tasks(caseId || "") });
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setTaskDialogOpen(true);
+  };
+
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    setTaskDialogOpen(true);
+  };
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return "—";
@@ -522,7 +554,7 @@ export default function CaseDetail() {
                     <CheckSquare className="h-4 w-4 text-primary" />
                     Tasks
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleCreateTask}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -542,23 +574,47 @@ export default function CaseDetail() {
                       <Skeleton key={i} className="h-12" />
                     ))}
                   </div>
-                ) : pendingTasks.length > 0 ? (
-                  <ScrollArea className="h-[200px]">
-                    <div className="space-y-2 pr-4">
-                      {pendingTasks.slice(0, 5).map((task) => {
+                ) : tasks.length > 0 ? (
+                  <ScrollArea className="h-[280px]">
+                    <div className="space-y-1 pr-4">
+                      {tasks.map((task) => {
                         const priority = task.priority || "medium";
                         const config = priorityConfig[priority];
+                        const isCompleted = task.status === "completed";
+                        const isOverdue = task.due_date && !isCompleted && parseISO(task.due_date) < new Date();
+                        
                         return (
                           <div 
                             key={task.id}
-                            className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                            className={cn(
+                              "group flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer",
+                              isCompleted && "opacity-60"
+                            )}
+                            onClick={() => handleEditTask(task)}
                           >
-                            <div className={cn("w-1.5 h-1.5 rounded-full mt-2", config.bg, config.color)} />
+                            <Checkbox
+                              checked={isCompleted}
+                              onCheckedChange={() => handleToggleTaskComplete(task)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-0.5"
+                            />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{task.title}</p>
+                              <div className="flex items-center gap-2">
+                                <p className={cn(
+                                  "text-sm font-medium truncate",
+                                  isCompleted && "line-through text-muted-foreground"
+                                )}>
+                                  {task.title}
+                                </p>
+                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", config.bg)} />
+                              </div>
                               {task.due_date && (
-                                <p className="text-xs text-muted-foreground">
+                                <p className={cn(
+                                  "text-xs",
+                                  isOverdue ? "text-destructive" : "text-muted-foreground"
+                                )}>
                                   Due {format(parseISO(task.due_date), "MMM d")}
+                                  {isOverdue && " (overdue)"}
                                 </p>
                               )}
                             </div>
@@ -568,9 +624,15 @@ export default function CaseDetail() {
                     </div>
                   </ScrollArea>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No pending tasks
-                  </p>
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      No tasks yet
+                    </p>
+                    <Button variant="outline" size="sm" onClick={handleCreateTask}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Task
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -673,6 +735,17 @@ export default function CaseDetail() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         caseData={caseData}
+      />
+
+      {/* Create/Edit Task Dialog */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={(open) => {
+          setTaskDialogOpen(open);
+          if (!open) setEditingTask(null);
+        }}
+        caseId={caseId || ""}
+        task={editingTask}
       />
     </AppLayout>
   );
