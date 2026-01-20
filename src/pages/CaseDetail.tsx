@@ -15,6 +15,15 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CaseDocumentUpload } from "@/components/cases/CaseDocumentUpload";
 import { EditCaseDialog } from "@/components/cases/EditCaseDialog";
 import { CreateTaskDialog } from "@/components/cases/CreateTaskDialog";
@@ -39,6 +48,8 @@ import {
   Plus,
   FolderOpen,
   Upload,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { format, formatDistanceToNow, parseISO, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -83,6 +94,8 @@ export default function CaseDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "in_progress" | "completed">("all");
+  const [taskSort, setTaskSort] = useState<"priority" | "due_date" | "status">("due_date");
 
   const { data: caseData, isLoading: caseLoading, error: caseError } = useCase(caseId || "");
   const updateTask = useUpdateTask();
@@ -144,6 +157,31 @@ export default function CaseDetail() {
   const pendingTasks = tasks.filter(t => t.status === "pending" || t.status === "in_progress");
   const completedTasks = tasks.filter(t => t.status === "completed");
   const taskProgress = tasks.length > 0 ? (completedTasks.length / tasks.length) * 100 : 0;
+
+  // Filter tasks
+  const filteredTasks = tasks.filter(task => {
+    if (taskFilter === "all") return true;
+    return task.status === taskFilter;
+  });
+
+  // Sort tasks
+  const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    switch (taskSort) {
+      case "priority":
+        return (priorityOrder[a.priority || "medium"] || 2) - (priorityOrder[b.priority || "medium"] || 2);
+      case "due_date":
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      case "status":
+        const statusOrder = { pending: 0, in_progress: 1, review: 2, completed: 3, cancelled: 4 };
+        return (statusOrder[a.status || "pending"] || 0) - (statusOrder[b.status || "pending"] || 0);
+      default:
+        return 0;
+    }
+  });
 
   const handleToggleTaskComplete = async (task: Task) => {
     const newStatus = task.status === "completed" ? "pending" : "completed";
@@ -554,9 +592,44 @@ export default function CaseDetail() {
                     <CheckSquare className="h-4 w-4 text-primary" />
                     Tasks
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={handleCreateTask}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <Filter className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuLabel className="text-xs">Filter by Status</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup value={taskFilter} onValueChange={(v) => setTaskFilter(v as typeof taskFilter)}>
+                          <DropdownMenuRadioItem value="all">All Tasks</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="pending">Pending</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="in_progress">In Progress</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="completed">Completed</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <ArrowUpDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuLabel className="text-xs">Sort by</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup value={taskSort} onValueChange={(v) => setTaskSort(v as typeof taskSort)}>
+                          <DropdownMenuRadioItem value="due_date">Due Date</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="priority">Priority</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="status">Status</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCreateTask}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 {tasks.length > 0 && (
                   <div className="flex items-center gap-3 mt-2">
@@ -574,10 +647,10 @@ export default function CaseDetail() {
                       <Skeleton key={i} className="h-12" />
                     ))}
                   </div>
-                ) : tasks.length > 0 ? (
+                ) : sortedTasks.length > 0 ? (
                   <ScrollArea className="h-[280px]">
                     <div className="space-y-1 pr-4">
-                      {tasks.map((task) => {
+                      {sortedTasks.map((task) => {
                         const priority = task.priority || "medium";
                         const config = priorityConfig[priority];
                         const isCompleted = task.status === "completed";
@@ -623,6 +696,10 @@ export default function CaseDetail() {
                       })}
                     </div>
                   </ScrollArea>
+                ) : tasks.length > 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No tasks match filter
+                  </p>
                 ) : (
                   <div className="text-center py-6">
                     <p className="text-sm text-muted-foreground mb-3">
